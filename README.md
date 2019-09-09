@@ -2,7 +2,7 @@
 
 ## Usage
 ```
-usage: mutool run anonymize.js document.pdf pageNumber output.png
+mutool run anonymize.js document.pdf pageNumber output.png
 ```
 
 ## Requirements
