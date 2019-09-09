@@ -5,7 +5,7 @@ var SubstitutionGroups = {
     lowerNormal:    "abcdeghknopqrsuvxyz",
     lowerWide:      "mw",
     upperNarrow:    "I",
-    upperNormal:    "ABCDEFGHIJKLNOPQRSTUVXYZ",
+    upperNormal:    "ABCDEFGHJKLNOPQRSTUVXYZ",
     upperWide:      "MW",
     digitNarrow:    "1",
     digitWide:      "023456789",
