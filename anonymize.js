@@ -1,5 +1,33 @@
 var Resolution = 300; //ppi
 
+if (scriptArgs.length != 3) {
+    print("usage: mutool run anonymize.js document.pdf pageNumber output.png")
+    quit(1);
+}
+
+var scaleMatrix = Scale(Resolution/72, Resolution/72);
+
+var doc = new Document(scriptArgs[0]);
+var page = doc.loadPage(parseInt(scriptArgs[1])-1);
+
+var CharacterMap = {};
+var updateCharacterMap = {
+    showGlyph: function (f, m, g, u, v, b) {
+        var fn = f.getName();
+        if (!(fn in CharacterMap)) {
+            CharacterMap[fn] = {};
+        }
+        CharacterMap[fn][u] = g;
+    }
+};
+page.run({
+    fillText: function(text, ctm, colorSpace, color, alpha) { text.walk(updateCharacterMap); },
+    clipText: function(text, ctm) { text.walk(updateCharacterMap); },
+    strokeText: function(text, stroke, ctm, colorSpace, color, alpha) { text.walk(updateCharacterMap); },
+    clipStrokeText: function(text, stroke, ctm) { text.walk(updateCharacterMap); },
+    ignoreText: function(text, ctm) { text.walk(updateCharacterMap); }
+}, Identity);
+
 var SubstitutionGroups = {
     lowerNarrow:    "fijlt",
     lowerNormal:    "abcdeghknopqrsuvxyz",
@@ -11,7 +39,6 @@ var SubstitutionGroups = {
     digitWide:      "023456789",
 };
 
-// TODO: Exclude characters for which there is no glyph in the embedded font.
 // TODO: Analyze document fonts to determine optimal character width groupings.
 
 function anonymizeUnicode(u) {
@@ -29,8 +56,11 @@ function anonymizeText(text) {
     var textExtractor = {
         showGlyph: function (f, m, g, u, v, b) {
             // Font, transform_Matrix, Glyph, Unicode, Vertical, BidiLevel
-            u = anonymizeUnicode(u);
-            g = f.encodeCharacter(u);
+            g = undefined;
+            while (g === undefined) {
+                u = anonymizeUnicode(u);
+                g = CharacterMap[f.getName()][u];
+            }
             anonymizedText.showGlyph(f, m, g, u, v, b);
         }
     };
@@ -112,17 +142,6 @@ function AnonymizingDrawDevice(transform, pixmap) {
     	return this.dd.close();
     };
 }
-
-if (scriptArgs.length != 3) {
-    print("usage: mutool run anonymize.js document.pdf pageNumber output.png")
-    quit(1);
-}
-
-var scaleMatrix = Scale(Resolution/72, Resolution/72);
-
-var doc = new Document(scriptArgs[0]);
-var page = doc.loadPage(parseInt(scriptArgs[1])-1);
-
 var pixmap = page.toPixmap(scaleMatrix, DeviceRGB);
 pixmap.clear(255);
 var anonymizingDevice = new AnonymizingDrawDevice(Identity, pixmap);
