@@ -17,7 +17,7 @@ var SubstitutionGroups = {
 function anonymizeUnicode(u) {
     for (var group in SubstitutionGroups) {
         var chars = SubstitutionGroups[group];
-        if (chars.indexOf(String.fromCharCode(u)) > 0) {
+        if (chars.indexOf(String.fromCharCode(u)) >= 0) {
             return chars[parseInt(Math.random()*chars.length)].charCodeAt(0);
         }
     }
