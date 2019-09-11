@@ -87,12 +87,20 @@ function anonymizeUnicode(fn, u) {
     return u;
 }
 
+var Substitutions = {};
+
 function anonymizeText(text) {
     var anonymizedText = new Text();
     var textExtractor = {
         showGlyph: function (f, m, g, u, v, b) {
             // Font, transform_Matrix, Glyph, Unicode, Vertical, BidiLevel
-            u = anonymizeUnicode(f.getName(), u);
+            var substitutionKey = f.getName() + "-" + m + "-" + u;
+            if (substitutionKey in Substitutions) {
+                u = Substitutions[substitutionKey];
+            } else {
+                u = anonymizeUnicode(f.getName(), u);
+                Substitutions[substitutionKey] = u;
+            }
             g = CharacterMap[f.getName()][u];
             anonymizedText.showGlyph(f, m, g, u, v, b);
         }
