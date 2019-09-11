@@ -11,75 +11,15 @@ var scaleMatrix = Scale(Resolution/72, Resolution/72);
 var doc = new Document(scriptArgs[0]);
 var page = doc.loadPage(parseInt(scriptArgs[1])-1);
 
-var CharacterMap = {};
-var CharacterWidths = {};
-var analyzeCharacters = {
-    showGlyph: function (f, m, g, u, v, b) {
-        var fn = f.getName();
-        if (!(fn in CharacterMap)) {
-            CharacterMap[fn] = {};
-        }
-        CharacterMap[fn][u] = g;
-        if (!(fn in CharacterWidths)) {
-            CharacterWidths[fn] = {};
-        }
-        CharacterWidths[fn][g] = f.advanceGlyph(g, 0);
-    }
-};
-page.run({
-    fillText: function(text, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
-    clipText: function(text, ctm) { text.walk(analyzeCharacters); },
-    strokeText: function(text, stroke, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
-    clipStrokeText: function(text, stroke, ctm) { text.walk(analyzeCharacters); },
-    ignoreText: function(text, ctm) { text.walk(analyzeCharacters); }
-}, Identity);
-
 var SubstitutionGroups = {
     lower: "abcdefghijklmnopqrstuvwxyz",
     upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     digit: "0123456789",
 };
 
-var FontSubstitutionGroups = {};
-for (var fn in CharacterMap) {
-    FontSubstitutionGroups[fn] = {};
+function anonymizeUnicode(u) {
     for (var group in SubstitutionGroups) {
-        var characters = [];
-        var widths = [];
-        for (var i = 0; i < SubstitutionGroups[group].length; ++i) {
-            var chr = SubstitutionGroups[group][i];
-            var unicode = chr.charCodeAt(0);
-            if (unicode in CharacterMap[fn]) {
-                var glyph = CharacterMap[fn][unicode];
-                var width = CharacterWidths[fn][glyph];
-                characters.push(chr);
-                widths.push(width);
-            }
-        }
-        var min = Math.min.apply(null, widths);
-        var max = Math.max.apply(null, widths);
-        var binSize = (max - min) / NWidthBins;
-        var discretizer = function (x) {
-            for (var i = 1; i <= NWidthBins; ++i) {
-                if (x <= min + (i*binSize)) {
-                    return i;
-                }
-            }
-        };
-        for (var i = 0; i < characters.length; ++i) {
-            var bin = discretizer(widths[i]);
-            var groupName = group + "-" + bin;
-            if (!(groupName in FontSubstitutionGroups[fn])) {
-                FontSubstitutionGroups[fn][groupName] = "";
-            }
-            FontSubstitutionGroups[fn][groupName] += characters[i];
-        }
-    }
-}
-
-function anonymizeUnicode(fn, u) {
-    for (var group in FontSubstitutionGroups[fn]) {
-        var chars = FontSubstitutionGroups[fn][group];
+        var chars = SubstitutionGroups[group];
         if (chars.indexOf(String.fromCharCode(u)) >= 0) {
             return chars[parseInt(Math.random()*chars.length)].charCodeAt(0);
         }
@@ -87,26 +27,124 @@ function anonymizeUnicode(fn, u) {
     return u;
 }
 
-var Substitutions = {};
+function advanceMatrix(m, font, glyph, wmode) {
+    var adv = font.advanceGlyph(glyph, wmode);
+    var tx = 0, ty = 0;
+    if (wmode == 0) {
+        tx = adv;
+    } else {
+        ty = -adv;
+    }
+    var m = m.slice();
+    m[4] += tx * m[0] + ty * m[2];
+    m[5] += tx * m[1] + ty * m[3];
+    return m;
+}
+
+function matricesDiffer(m1, m2) {
+    if (m1.length != m2.length) {
+        return true;
+    }
+    for (var i = 0; i < m1.length; ++i) {
+        if (Math.abs(m1[i] - m2[i]) > 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function splitText(text) {
+    var glyphs = []
+    text.walk({
+        showGlyph: function (f, m, g, u, v) {
+            glyphs.push({
+                "font": f, 
+                "matrix": m,
+                "nextMatrix": advanceMatrix(m, f, g, v),
+                "glyph": g,
+                "unicode": u,
+                "wmode": v
+            });
+        }
+    });
+    var chunks = [];
+    var chunk = [];
+    for (var i = 0; i < glyphs.length; ++i) {
+        var curr = glyphs[i];
+        var last = chunk[chunk.length-1];
+        if (last !== undefined) {
+            if (curr.font != last.font || curr.wmode != last.wmode || matricesDiffer(curr.matrix, last.nextMatrix)) {
+                chunks.push(chunk);
+                chunk = [];
+            }
+        }
+        chunk.push(curr);
+    }
+    if (chunk && chunk.length > 0) {
+        chunks.push(chunk);
+    }
+    for (var i = 0; i < chunks.length; ++i) {
+        var characters = "";
+        for (var j = 0; j < chunks[i].length; ++j) {
+            characters += String.fromCharCode(chunks[i][j].unicode);
+        }
+    }
+    return chunks;
+}
+
+function mergeParts(parts) {
+    var text = new Text();
+    for (var i = 0; i < parts.length; ++i) {
+        parts[i].walk(text);
+    }
+    return text;
+}
 
 function anonymizeText(text) {
-    var anonymizedText = new Text();
-    var textExtractor = {
-        showGlyph: function (f, m, g, u, v, b) {
-            // Font, transform_Matrix, Glyph, Unicode, Vertical, BidiLevel
-            var substitutionKey = f.getName() + "-" + m + "-" + u;
+    var parts = splitText(text);
+    for (var i = 0; i < parts.length; ++i) {
+        parts[i] = anonymizePart(parts[i]);
+    }
+    return mergeParts(parts);
+}
+
+var Substitutions = {}
+
+function anonymizePart(glyphs) {
+    while (true) {
+        var anonymizedText = new Text();
+        var f = glyphs[0].font;
+        var m = glyphs[0].matrix;
+        var v = glyphs[0].wmode;
+        var partSubstitutions = {};
+        for (var i = 0; i < glyphs.length; ++i) {
+            var u, g = 0;
+            var substitutionKey = f.getName() + "-" + m + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + v;
             if (substitutionKey in Substitutions) {
-                u = Substitutions[substitutionKey];
+                u = Substitutions[substitutionKey][0];
+                g = Substitutions[substitutionKey][1];
             } else {
-                u = anonymizeUnicode(f.getName(), u);
-                Substitutions[substitutionKey] = u;
+                while (g == 0) {
+                    u = anonymizeUnicode(glyphs[i].unicode);
+                    if (u == glyphs[i].unicode) {
+                        g = glyphs[i].glyph;
+                        break;
+                    } else {
+                        g = f.encodeCharacter(u);
+                    }
+                }
             }
-            g = CharacterMap[f.getName()][u];
-            anonymizedText.showGlyph(f, m, g, u, v, b);
+            partSubstitutions[substitutionKey] = [u, g];
+            anonymizedText.showGlyph(f, m, g, u, v);
+            m = advanceMatrix(m, f, g, v);
         }
-    };
-    text.walk(textExtractor);
-    return anonymizedText;
+        if (!matricesDiffer(m, glyphs[glyphs.length-1].nextMatrix)) {
+            for (var k in partSubstitutions) {
+                Substitutions[k] = partSubstitutions[k];
+            }
+            return anonymizedText;
+        }
+    }
 }
 
 // We cannot use inheritence to extend DrawDevice, since it is a native
