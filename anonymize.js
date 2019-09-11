@@ -1,4 +1,5 @@
 var Resolution = 300; //ppi
+var NWidthBins = 5;
 
 if (scriptArgs.length != 3) {
     print("usage: mutool run anonymize.js document.pdf pageNumber output.png")
@@ -53,30 +54,38 @@ var SubstitutionGroups = {
 };
 var FontSubstitutionGroups = {};
 
-Array.prototype.chunk = function(n) {
-    if (!this.length) return [];
-    return [this.slice(0, n)].concat(this.slice(n).chunk(n));
-};
-
 for (var fn in CharacterMap) {
     FontSubstitutionGroups[fn] = {};
     for (var group in SubstitutionGroups) {
-        var characters = {};
+        var characters = [];
+        var widths = [];
         for (var i = 0; i < SubstitutionGroups[group].length; ++i) {
             var chr = SubstitutionGroups[group][i];
             var unicode = chr.charCodeAt(0);
             if (unicode in CharacterMap[fn]) {
                 var glyph = CharacterMap[fn][unicode];
                 var width = CharacterWidths[fn][glyph];
-                width = parseInt(Math.round(width * 10));
-                if (!(width in characters)) {
-                    characters[width] = [];
-                }
-                characters[width].push(chr);
+                characters.push(chr);
+                widths.push(width);
             }
         }
-        for (width in characters) {
-            FontSubstitutionGroups[fn][group+"-"+width] = characters[width].join("");
+        var min = Math.min.apply(null, widths);
+        var max = Math.max.apply(null, widths);
+        var binSize = (max - min) / NWidthBins;
+        var discretizer = function (x) {
+            for (var i = 1; i <= NWidthBins; ++i) {
+                if (x <= min + (i*binSize)) {
+                    return i;
+                }
+            }
+        };
+        for (var i = 0; i < characters.length; ++i) {
+            var bin = discretizer(widths[i]);
+            var groupName = group + "-" + bin;
+            if (!(groupName in FontSubstitutionGroups[fn])) {
+                FontSubstitutionGroups[fn][groupName] = "";
+            }
+            FontSubstitutionGroups[fn][groupName] += characters[i];
         }
     }
 }
