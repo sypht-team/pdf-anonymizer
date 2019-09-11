@@ -60,12 +60,20 @@ function advanceMatrix(m, font, glyph, wmode) {
     return m;
 }
 
-function matricesDiffer(m1, m2) {
+function matricesDiffer(m1, m2, tol) {
+    if (tol === undefined) {
+        tol = 1.0;
+    }
     if (m1.length != m2.length) {
         return true;
     }
-    for (var i = 0; i < m1.length; ++i) {
-        if (Math.abs(m1[i] - m2[i]) > 1) {
+    for (var i = 0; i < 4; ++i) {
+        if (m1[i] != m2[i]) {
+            return true;
+        }
+    }
+    for (var i = 4; i < m1.length; ++i) {
+        if (Math.abs(m1[i] - m2[i]) > tol) {
             return true;
         }
     }
@@ -157,7 +165,7 @@ function anonymizePart(glyphs) {
             anonymizedText.showGlyph(f, m, g, u, v);
             m = advanceMatrix(m, f, g, v);
         }
-        if (!matricesDiffer(m, glyphs[glyphs.length-1].nextMatrix)) {
+        if (!matricesDiffer(m, glyphs[glyphs.length-1].nextMatrix, 2)) {
             for (var k in partSubstitutions) {
                 Substitutions[k] = partSubstitutions[k];
             }
