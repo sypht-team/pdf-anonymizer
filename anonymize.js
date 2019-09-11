@@ -12,27 +12,14 @@ var doc = new Document(scriptArgs[0]);
 var page = doc.loadPage(parseInt(scriptArgs[1])-1);
 
 var CharacterMap = {};
-var updateCharacterMap = {
+var CharacterWidths = {};
+var analyzeCharacters = {
     showGlyph: function (f, m, g, u, v, b) {
         var fn = f.getName();
         if (!(fn in CharacterMap)) {
             CharacterMap[fn] = {};
         }
         CharacterMap[fn][u] = g;
-    }
-};
-page.run({
-    fillText: function(text, ctm, colorSpace, color, alpha) { text.walk(updateCharacterMap); },
-    clipText: function(text, ctm) { text.walk(updateCharacterMap); },
-    strokeText: function(text, stroke, ctm, colorSpace, color, alpha) { text.walk(updateCharacterMap); },
-    clipStrokeText: function(text, stroke, ctm) { text.walk(updateCharacterMap); },
-    ignoreText: function(text, ctm) { text.walk(updateCharacterMap); }
-}, Identity);
-
-var CharacterWidths = {};
-var updateCharacterWidths = {
-    showGlyph: function (f, m, g, u, v, b) {
-        var fn = f.getName();
         if (!(fn in CharacterWidths)) {
             CharacterWidths[fn] = {};
         }
@@ -40,11 +27,11 @@ var updateCharacterWidths = {
     }
 };
 page.run({
-    fillText: function(text, ctm, colorSpace, color, alpha) { text.walk(updateCharacterWidths); },
-    clipText: function(text, ctm) { text.walk(updateCharacterWidths); },
-    strokeText: function(text, stroke, ctm, colorSpace, color, alpha) { text.walk(updateCharacterWidths); },
-    clipStrokeText: function(text, stroke, ctm) { text.walk(updateCharacterWidths); },
-    ignoreText: function(text, ctm) { text.walk(updateCharacterWidths); }
+    fillText: function(text, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
+    clipText: function(text, ctm) { text.walk(analyzeCharacters); },
+    strokeText: function(text, stroke, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
+    clipStrokeText: function(text, stroke, ctm) { text.walk(analyzeCharacters); },
+    ignoreText: function(text, ctm) { text.walk(analyzeCharacters); }
 }, Identity);
 
 var SubstitutionGroups = {
@@ -52,8 +39,8 @@ var SubstitutionGroups = {
     upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     digit: "0123456789",
 };
-var FontSubstitutionGroups = {};
 
+var FontSubstitutionGroups = {};
 for (var fn in CharacterMap) {
     FontSubstitutionGroups[fn] = {};
     for (var group in SubstitutionGroups) {
