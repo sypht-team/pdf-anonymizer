@@ -61,21 +61,22 @@ Array.prototype.chunk = function(n) {
 for (var fn in CharacterMap) {
     FontSubstitutionGroups[fn] = {};
     for (var group in SubstitutionGroups) {
-        var characters = [];
+        var characters = {};
         for (var i = 0; i < SubstitutionGroups[group].length; ++i) {
             var chr = SubstitutionGroups[group][i];
             var unicode = chr.charCodeAt(0);
             if (unicode in CharacterMap[fn]) {
                 var glyph = CharacterMap[fn][unicode];
                 var width = CharacterWidths[fn][glyph];
-                characters.push([width, chr]);
+                width = parseInt(Math.round(width * 10));
+                if (!(width in characters)) {
+                    characters[width] = [];
+                }
+                characters[width].push(chr);
             }
         }
-        characters.sort();
-        characters = characters.map(function(x) { return x[1]; });
-        var chunks = characters.chunk(5);
-        for (var i = 0; i < chunks.length; ++i) {
-            FontSubstitutionGroups[fn][group+"-"+i] = chunks[i].join("");
+        for (width in characters) {
+            FontSubstitutionGroups[fn][group+"-"+width] = characters[width].join("");
         }
     }
 }
