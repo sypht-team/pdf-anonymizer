@@ -11,6 +11,25 @@ var scaleMatrix = Scale(Resolution/72, Resolution/72);
 var doc = new Document(scriptArgs[0]);
 var page = doc.loadPage(parseInt(scriptArgs[1])-1);
 
+var CharacterMap = {};
+var analyzeCharacters = {
+    showGlyph: function (f, m, g, u, v, b) {
+        var fn = f.getName();
+        if (!(fn in CharacterMap)) {
+            CharacterMap[fn] = {};
+        }
+        CharacterMap[fn][u] = g;
+    }
+};
+page.run({
+    fillText: function(text, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
+    clipText: function(text, ctm) { text.walk(analyzeCharacters); },
+    strokeText: function(text, stroke, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
+    clipStrokeText: function(text, stroke, ctm) { text.walk(analyzeCharacters); },
+    ignoreText: function(text, ctm) { text.walk(analyzeCharacters); }
+}, Identity);
+
+
 var SubstitutionGroups = {
     lower: "abcdefghijklmnopqrstuvwxyz",
     upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
@@ -124,13 +143,13 @@ function anonymizePart(glyphs) {
                 u = Substitutions[substitutionKey][0];
                 g = Substitutions[substitutionKey][1];
             } else {
-                while (g == 0) {
+                while (!g) {
                     u = anonymizeUnicode(glyphs[i].unicode);
                     if (u == glyphs[i].unicode) {
                         g = glyphs[i].glyph;
                         break;
                     } else {
-                        g = f.encodeCharacter(u);
+                        g = CharacterMap[f.getName()][u];
                     }
                 }
             }
