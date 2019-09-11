@@ -28,22 +28,61 @@ page.run({
     ignoreText: function(text, ctm) { text.walk(updateCharacterMap); }
 }, Identity);
 
+var CharacterWidths = {};
+var updateCharacterWidths = {
+    showGlyph: function (f, m, g, u, v, b) {
+        var fn = f.getName();
+        if (!(fn in CharacterWidths)) {
+            CharacterWidths[fn] = {};
+        }
+        CharacterWidths[fn][g] = f.advanceGlyph(g, 0);
+    }
+};
+page.run({
+    fillText: function(text, ctm, colorSpace, color, alpha) { text.walk(updateCharacterWidths); },
+    clipText: function(text, ctm) { text.walk(updateCharacterWidths); },
+    strokeText: function(text, stroke, ctm, colorSpace, color, alpha) { text.walk(updateCharacterWidths); },
+    clipStrokeText: function(text, stroke, ctm) { text.walk(updateCharacterWidths); },
+    ignoreText: function(text, ctm) { text.walk(updateCharacterWidths); }
+}, Identity);
+
 var SubstitutionGroups = {
-    lowerNarrow:    "fijlt",
-    lowerNormal:    "abcdeghknopqrsuvxyz",
-    lowerWide:      "mw",
-    upperNarrow:    "I",
-    upperNormal:    "ABCDEFGHJKLNOPQRSTUVXYZ",
-    upperWide:      "MW",
-    digitNarrow:    "1",
-    digitWide:      "023456789",
+    lower: "abcdefghijklmnopqrstuvwxyz",
+    upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    digit: "0123456789",
+};
+var FontSubstitutionGroups = {};
+
+Array.prototype.chunk = function(n) {
+    if (!this.length) return [];
+    return [this.slice(0, n)].concat(this.slice(n).chunk(n));
 };
 
-// TODO: Analyze document fonts to determine optimal character width groupings.
-
-function anonymizeUnicode(u) {
+for (var fn in CharacterMap) {
+    FontSubstitutionGroups[fn] = {};
     for (var group in SubstitutionGroups) {
-        var chars = SubstitutionGroups[group];
+        var characters = [];
+        for (var i = 0; i < SubstitutionGroups[group].length; ++i) {
+            var chr = SubstitutionGroups[group][i];
+            var unicode = chr.charCodeAt(0);
+            if (unicode in CharacterMap[fn]) {
+                var glyph = CharacterMap[fn][unicode];
+                var width = CharacterWidths[fn][glyph];
+                characters.push([width, chr]);
+            }
+        }
+        characters.sort();
+        characters = characters.map(function(x) { return x[1]; });
+        var chunks = characters.chunk(5);
+        for (var i = 0; i < chunks.length; ++i) {
+            FontSubstitutionGroups[fn][group+"-"+i] = chunks[i].join("");
+        }
+    }
+}
+
+function anonymizeUnicode(fn, u) {
+    for (var group in FontSubstitutionGroups[fn]) {
+        var chars = FontSubstitutionGroups[fn][group];
         if (chars.indexOf(String.fromCharCode(u)) >= 0) {
             return chars[parseInt(Math.random()*chars.length)].charCodeAt(0);
         }
@@ -56,11 +95,8 @@ function anonymizeText(text) {
     var textExtractor = {
         showGlyph: function (f, m, g, u, v, b) {
             // Font, transform_Matrix, Glyph, Unicode, Vertical, BidiLevel
-            g = undefined;
-            while (g === undefined) {
-                u = anonymizeUnicode(u);
-                g = CharacterMap[f.getName()][u];
-            }
+            u = anonymizeUnicode(f.getName(), u);
+            g = CharacterMap[f.getName()][u];
             anonymizedText.showGlyph(f, m, g, u, v, b);
         }
     };
