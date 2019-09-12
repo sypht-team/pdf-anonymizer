@@ -147,17 +147,17 @@ function mergeParts(parts) {
     return text;
 }
 
-function anonymizeText(text) {
+function anonymizeText(text, ctm) {
     var parts = splitText(text);
     for (var i = 0; i < parts.length; ++i) {
-        parts[i] = anonymizePart(parts[i]);
+        parts[i] = anonymizePart(parts[i], ctm);
     }
     return mergeParts(parts);
 }
 
 var Substitutions = {}
 
-function anonymizePart(glyphs) {
+function anonymizePart(glyphs, ctm) {
     var attempts = 0;
     var tolerance = GlyphReplacementTolerance * glyphs[0].matrix[0];
     print("font size:", glyphs[0].matrix[0], "tolerance:", tolerance);
@@ -173,7 +173,7 @@ function anonymizePart(glyphs) {
         for (var i = 0; i < glyphs.length; ++i) {
             var u, g = 0;
             original += String.fromCharCode(glyphs[i].unicode);
-            var substitutionKey = f.getName() + "-" + m + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + v;
+            var substitutionKey = f.getName() + "-" + Concat(m, ctm) + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + v;
             if (substitutionKey in Substitutions) {
                 u = Substitutions[substitutionKey][0];
                 g = Substitutions[substitutionKey][1];
@@ -227,27 +227,27 @@ function anonymizePart(glyphs) {
 function AnonymizingDrawDevice(transform, pixmap) {
     this.dd = DrawDevice(transform, pixmap);
     this.fillText = function(text, ctm, colorSpace, color, alpha) {
-    	text = anonymizeText(text);
+        text = anonymizeText(text, ctm);
         return this.dd.fillText(text, ctm, colorSpace, color, alpha);
     };
     this.clipText = function(text, ctm) {
-    	text = anonymizeText(text);
+        text = anonymizeText(text, ctm);
         return this.dd.clipText(text, ctm);
     };
     this.strokeText = function(text, stroke, ctm, colorSpace, color, alpha) {
-    	text = anonymizeText(text);
+        text = anonymizeText(text, ctm);
         return this.dd.strokeText(text, stroke, ctm, colorSpace, color, alpha);
     };
     this.clipStrokeText = function(text, stroke, ctm) {
-    	text = anonymizeText(text);
+        text = anonymizeText(text, ctm);
         return this.dd.clipStrokeText(text, stroke, ctm);
     };
     this.ignoreText = function(text, ctm) {
-    	text = anonymizeText(text);
+        text = anonymizeText(text, ctm);
         return this.dd.ignoreText(text, ctm);
     };
     this.fillPath = function(path, evenOdd, ctm, colorSpace, color, alpha) {
-    	return this.dd.fillPath(path, evenOdd, ctm, colorSpace, color, alpha);
+        return this.dd.fillPath(path, evenOdd, ctm, colorSpace, color, alpha);
     };
     this.clipPath = function(path, evenOdd, ctm) {
         return this.dd.clipPath(path, evenOdd, ctm);
@@ -289,10 +289,10 @@ function AnonymizingDrawDevice(transform, pixmap) {
         return this.dd.beginTile(area, view, xstep, ystep, ctm, id);
     };
     this.endTile = function() {
-    	return this.dd.endTile();
+        return this.dd.endTile();
     };
     this.close = function() {
-    	return this.dd.close();
+        return this.dd.close();
     };
 }
 var pixmap = page.toPixmap(scaleMatrix, DeviceRGB);
