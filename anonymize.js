@@ -1,5 +1,25 @@
-var Resolution = 300; //ppi
-var NWidthBins = 5;
+// Output image resolution in pixels per inch.
+var Resolution = 300;
+
+// Determines how lenient the algorithm will be when finding anonymized text of
+// similar dimensions to the original text. If the distance between the end of
+// the anonymized token and the end of the original token exceeds
+// GlyphReplacementTolerance*fontSize, the proposed replacement will be rejected.
+var GlyphReplacementTolerance = 0.1;
+
+// The following two parameters determine how frequently and by how much the
+// GlyphReplacementTolerance is backed off. If the number of attempts to find a
+// sequence of glyphs of correct dimensions exceeds BackOffFrequency*sequenceLength,
+// the current value of GlyphReplacementTolerance is multiplied by BackOffAmount.
+// Back off is only applied per token.
+var BackOffFrequency = 10;
+var BackOffAmount = 1.5;
+
+// Determines when a sequence of glyphs should be split into multiple parts. If
+// the distance between the previous glyph's advanced matrix and the current
+// glyph's matrix is greater than MaxGlyphDistance*fontSize, then a split occurs.
+// This parameter should rarely require tuning.
+var MaxGlyphDistance = 0.1;
 
 if (scriptArgs.length != 3) {
     print("usage: mutool run anonymize.js document.pdf pageNumber output.png")
@@ -66,16 +86,13 @@ function distance(m1, m2) {
     return Math.sqrt(dx*dx + dy*dy);
 }
 
-function matricesDiffer(m1, m2, maxDistance) {
-    if (maxDistance === undefined) {
-        maxDistance = 0.1;
-    }
+function matricesDiffer(m1, m2) {
     for (var i = 0; i < 4; ++i) {
         if (m1[i] != m2[i]) {
             return true;
         }
     }
-    if (distance(m1, m2) > maxDistance * m1[0]) {
+    if (distance(m1, m2) > MaxGlyphDistance * m1[0]) {
         return true;
     }
     return false;
@@ -142,8 +159,7 @@ var Substitutions = {}
 
 function anonymizePart(glyphs) {
     var attempts = 0;
-    var initialTolerance = 0.1;
-    var tolerance = initialTolerance * glyphs[0].matrix[0];
+    var tolerance = GlyphReplacementTolerance * glyphs[0].matrix[0];
     print("font size:", glyphs[0].matrix[0], "tolerance:", tolerance);
     while (true) {
         attempts++;
@@ -198,8 +214,8 @@ function anonymizePart(glyphs) {
         } else {
             print("too narrow", delta);
         }
-        if (attempts % (10*glyphs.length) == 0) {
-            tolerance *= 1.5;
+        if (attempts % (BackOffFrequency * glyphs.length) == 0) {
+            tolerance *= BackOffAmount;
             print("increasing tolerance to", tolerance);
         }
     }
