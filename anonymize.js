@@ -142,10 +142,9 @@ var Substitutions = {}
 
 function anonymizePart(glyphs) {
     var attempts = 0;
-    var avgGlyphLength = distance(glyphs[0].matrix, glyphs[glyphs.length-1].nextMatrix) / glyphs.length;
-    var initialTolerance = 0.15;
-    var tolerance = initialTolerance * avgGlyphLength;
-    print("average glyph length is", avgGlyphLength, "tolerance is", tolerance);
+    var initialTolerance = 0.075;
+    var tolerance = initialTolerance * glyphs[0].matrix[0];
+    print("font size:", glyphs[0].matrix[0], "tolerance:", tolerance);
     while (true) {
         attempts++;
         var anonymizedText = new Text();
