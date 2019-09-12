@@ -90,6 +90,8 @@ var SubstitutionGroups = {
     digit: "0123456789",
 };
 
+var WhitelistCharacters = " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+
 function anonymizeUnicode(u) {
     for (var group in SubstitutionGroups) {
         var chars = SubstitutionGroups[group];
@@ -237,7 +239,11 @@ function anonymizePart(glyphs, ctm) {
                     u = anonymizeUnicode(glyphs[i].unicode);
                     if (u == glyphs[i].unicode) {
                         g = glyphs[i].glyph;
-                        color = [0, 1, 1];
+                        if (WhitelistCharacters.indexOf(String.fromCharCode(glyphs[i].unicode)) >= 0) {
+                            color = [0, 1, 0];
+                        } else {
+                            color = [0, 1, 1];
+                        }
                         break;
                     } else {
                         color = [0, 1, 0];
