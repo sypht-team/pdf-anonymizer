@@ -221,7 +221,7 @@ function anonymizePart(glyphs, ctm) {
         for (var i = 0; i < glyphs.length; ++i) {
             var u, g = 0;
             original += String.fromCharCode(glyphs[i].unicode);
-            var substitutionKey = f.getName() + "-" + Concat(m, ctm) + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + v;
+            var substitutionKey = f.getName() + "-" + Concat(glyphs[i].matrix, ctm) + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + v;
             if (substitutionKey in Substitutions) {
                 u = Substitutions[substitutionKey][0];
                 g = Substitutions[substitutionKey][1];
