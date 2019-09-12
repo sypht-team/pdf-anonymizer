@@ -256,6 +256,9 @@ function anonymizePart(glyphs, ctm) {
                 }
             }
             if (color) {
+                if (WhitelistCharacters.indexOf(String.fromCharCode(u)) < 0 && Object.keys(CharacterMap[f.getName()]).length <= 10) {
+                    color = [1, 0, 0];
+                }
                 var vertices = [];
                 vertices.push([Concat(m, ctm)[4], Concat(m, ctm)[5]]);
                 vertices.push([Concat(m, ctm)[4] + Concat(m, ctm)[1], Concat(m, ctm)[5] - Concat(m, ctm)[0]]);
