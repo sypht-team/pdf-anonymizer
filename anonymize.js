@@ -50,12 +50,16 @@ try {
 function glyphInWhitelist(glyph, ctm) {
     var currM = Concat(glyph.matrix, ctm);
     var nextM = Concat(glyph.nextMatrix, ctm);
-    var x0 = (currM[4] + nextM[4])/2;
-    var y0 = (currM[5] + nextM[5])/2;
+    var x = [currM[4], nextM[4], (currM[4] + nextM[4])/2];
+    var y = [currM[5], nextM[5], (currM[5] + nextM[5])/2];
     for (var i = 0; i < whitelist.length; ++i) {
         var a = whitelist[i];
-        if (x0 >= a.x1 && x0 <= a.x2 && y0 >= a.y1 && y0 <= a.y2) {
-            return true;
+        for (var j = 0; j < x.length; ++j) {
+            var x0 = x[j];
+            var y0 = y[j];
+            if (x0 >= a.x1 && x0 <= a.x2 && y0 >= a.y1 && y0 <= a.y2) {
+                return true;
+            }
         }
     }
     return false;
