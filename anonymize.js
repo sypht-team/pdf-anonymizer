@@ -157,6 +157,20 @@ function anonymizeText(text, ctm) {
 
 var Substitutions = {}
 
+function countReplacableCharacters(glyphs) {
+    var count = 0;
+    for (var i = 0; i < glyphs.length; ++i) {
+        for (var group in SubstitutionGroups) {
+            var chars = SubstitutionGroups[group];
+            if (chars.indexOf(String.fromCharCode(glyphs[i].unicode)) >= 0) {
+                count += 1;
+                break
+            }
+        }
+    }
+    return count;
+}
+
 function anonymizePart(glyphs, ctm) {
     var attempts = 0;
     var tolerance = GlyphReplacementTolerance * glyphs[0].matrix[0];
@@ -200,7 +214,7 @@ function anonymizePart(glyphs, ctm) {
         } else {
             delta = m[5] - glyphs[glyphs.length-1].nextMatrix[5];
         }
-        if (distance(m, glyphs[glyphs.length-1].nextMatrix) <= tolerance) {
+        if (countReplacableCharacters(glyphs) == 0 || distance(m, glyphs[glyphs.length-1].nextMatrix) <= tolerance) {
             print("close enough", delta);
             for (var k in partSubstitutions) {
                 Substitutions[k] = partSubstitutions[k];
