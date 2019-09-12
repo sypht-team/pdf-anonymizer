@@ -221,12 +221,14 @@ function anonymizePart(glyphs, ctm) {
         var v = glyphs[0].wmode;
         var partSubstitutions = {};
         var original = "";
+        for (var i = 0; i < glyphs.length; ++i) {
+            original += String.fromCharCode(glyphs[i].unicode);
+        }
         var replaced = "";
         for (var i = 0; i < glyphs.length; ++i) {
             var u, g = 0;
             var color = null;
-            original += String.fromCharCode(glyphs[i].unicode);
-            var substitutionKey = f.getName() + "-" + Concat(glyphs[i].matrix, ctm) + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + v;
+            var substitutionKey = glyphs[i].font.getName() + "-" + Concat(glyphs[i].matrix, ctm) + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + glyphs[i].wmode;
             if (substitutionKey in Substitutions) {
                 u = Substitutions[substitutionKey][0];
                 g = Substitutions[substitutionKey][1];
@@ -252,11 +254,12 @@ function anonymizePart(glyphs, ctm) {
                 }
             }
             if (color) {
-                var x1 = Concat(m, ctm)[4];
-                var x2 = Concat(advanceMatrix(m, f, g, v), ctm)[4] + Concat(m, ctm)[1];
-                var y1 = Concat(m, ctm)[5];
-                var y2 = Concat(advanceMatrix(m, f, g, v), ctm)[5] - Concat(m, ctm)[0];
-                Replacements[substitutionKey] = {"x1": x1, "y1": y1, "x2": x2, "y2": y2, "color": color};
+                var vertices = [];
+                vertices.push([Concat(m, ctm)[4], Concat(m, ctm)[5]]);
+                vertices.push([Concat(m, ctm)[4] + Concat(m, ctm)[1], Concat(m, ctm)[5] - Concat(m, ctm)[0]]);
+                vertices.push([Concat(advanceMatrix(m, f, g, v), ctm)[4] + Concat(advanceMatrix(m, f, g, v), ctm)[1], Concat(advanceMatrix(m, f, g, v), ctm)[5] - Concat(advanceMatrix(m, f, g, v), ctm)[0]]);
+                vertices.push([Concat(advanceMatrix(m, f, g, v), ctm)[4], Concat(advanceMatrix(m, f, g, v), ctm)[5]]);
+                Replacements[substitutionKey] = {"color": color, "vertices": vertices};
             }
             replaced += String.fromCharCode(u);
             partSubstitutions[substitutionKey] = [u, g];
@@ -372,7 +375,12 @@ pixmap.saveAsPNG(scriptArgs[2]);
 for (var k in Replacements) {
     var r = Replacements[k];
     var p = new Path();
-    p.rect(r.x1, r.y1, r.x2, r.y2);
+    p.moveTo(r.vertices[r.vertices.length-1][0], r.vertices[r.vertices.length-1][1])
+    for (var j = 0; j < r.vertices.length; ++j) {
+        var x = r.vertices[j][0];
+        var y = r.vertices[j][1];
+        p.lineTo(x, y);
+    }
     anonymizingDevice.fillPath(p, true, Identity, DeviceRGB, r.color, 0.3);
 }
 
