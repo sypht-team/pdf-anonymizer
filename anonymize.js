@@ -30,6 +30,36 @@ var scaleMatrix = Scale(Resolution/72, Resolution/72);
 
 var doc = new Document(scriptArgs[0]);
 var page = doc.loadPage(parseInt(scriptArgs[1])-1);
+var pixmap = page.toPixmap(scaleMatrix, DeviceRGB);
+pixmap.clear(255);
+
+var whitelist = [];
+try {
+    whitelist = read(scriptArgs[0].replace(".pdf", ".json"));
+    whitelist = JSON.parse(whitelist);
+    for (var i = 0; i < whitelist.length; ++i) {
+        whitelist[i].x1 *= pixmap.getWidth();
+        whitelist[i].x2 *= pixmap.getWidth();
+        whitelist[i].y1 *= pixmap.getHeight();
+        whitelist[i].y2 *= pixmap.getHeight();
+    }
+} catch (err) {
+    // pass
+}
+
+function glyphInWhitelist(glyph, ctm) {
+    var currM = Concat(glyph.matrix, ctm);
+    var nextM = Concat(glyph.nextMatrix, ctm);
+    var x0 = (currM[4] + nextM[4])/2;
+    var y0 = (currM[5] + nextM[5])/2;
+    for (var i = 0; i < whitelist.length; ++i) {
+        var a = whitelist[i];
+        if (x0 >= a.x1 && x0 <= a.x2 && y0 >= a.y1 && y0 <= a.y2) {
+            return true;
+        }
+    }
+    return false;
+}
 
 var CharacterMap = {};
 var analyzeCharacters = {
@@ -191,6 +221,9 @@ function anonymizePart(glyphs, ctm) {
             if (substitutionKey in Substitutions) {
                 u = Substitutions[substitutionKey][0];
                 g = Substitutions[substitutionKey][1];
+            } else if (glyphInWhitelist(glyphs[i], ctm)) {
+                u = glyphs[i].unicode;
+                g = glyphs[i].glyph;
             } else {
                 while (!g) {
                     u = anonymizeUnicode(glyphs[i].unicode);
@@ -309,8 +342,6 @@ function AnonymizingDrawDevice(transform, pixmap) {
         return this.dd.close();
     };
 }
-var pixmap = page.toPixmap(scaleMatrix, DeviceRGB);
-pixmap.clear(255);
 var anonymizingDevice = new AnonymizingDrawDevice(Identity, pixmap);
 page.run(anonymizingDevice, scaleMatrix);
 anonymizingDevice.close()
