@@ -232,6 +232,8 @@ function anonymizePart(glyphs, ctm) {
             if (substitutionKey in Substitutions) {
                 u = Substitutions[substitutionKey][0];
                 g = Substitutions[substitutionKey][1];
+                color = [1, 1, 0];
+                Replacements[substitutionKey] = {"color": color, "vertices": Replacements[substitutionKey].vertices};
             } else if (glyphInWhitelist(glyphs[i], ctm)) {
                 u = glyphs[i].unicode;
                 g = glyphs[i].glyph;
