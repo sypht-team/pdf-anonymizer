@@ -93,6 +93,7 @@ function splitText(text) {
                 "unicode": u,
                 "wmode": v
             });
+            print("char:", String.fromCharCode(u), "curr:", m, "next:", advanceMatrix(m, f, g, v));
         }
     });
     var chunks = [];
@@ -116,6 +117,7 @@ function splitText(text) {
         for (var j = 0; j < chunks[i].length; ++j) {
             characters += String.fromCharCode(chunks[i][j].unicode);
         }
+        print("chunk " + i + ": " + characters);
     }
     return chunks;
 }
@@ -139,14 +141,19 @@ function anonymizeText(text) {
 var Substitutions = {}
 
 function anonymizePart(glyphs) {
+    var attempts = 0;
     while (true) {
+        attempts++;
         var anonymizedText = new Text();
         var f = glyphs[0].font;
         var m = glyphs[0].matrix;
         var v = glyphs[0].wmode;
         var partSubstitutions = {};
+        var original = "";
+        var replaced = "";
         for (var i = 0; i < glyphs.length; ++i) {
             var u, g = 0;
+            original += String.fromCharCode(glyphs[i].unicode);
             var substitutionKey = f.getName() + "-" + m + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + v;
             if (substitutionKey in Substitutions) {
                 u = Substitutions[substitutionKey][0];
@@ -162,15 +169,31 @@ function anonymizePart(glyphs) {
                     }
                 }
             }
+            replaced += String.fromCharCode(u);
             partSubstitutions[substitutionKey] = [u, g];
             anonymizedText.showGlyph(f, m, g, u, v);
             m = advanceMatrix(m, f, g, v);
         }
+        print(original, " -> ", replaced);
+        var delta;
+        if (v == 0) {
+            delta = m[4] - glyphs[glyphs.length-1].nextMatrix[4];
+        } else {
+            delta = m[5] - glyphs[glyphs.length-1].nextMatrix[5];
+        }
         if (distance(m, glyphs[glyphs.length-1].nextMatrix) < 3) {
+            print("close enough", delta);
             for (var k in partSubstitutions) {
                 Substitutions[k] = partSubstitutions[k];
             }
+            print("attempts:", attempts);
+            print("\n");
             return anonymizedText;
+        }
+        if (delta > 0) {
+            print("too wide", delta);
+        } else {
+            print("too narrow", delta);
         }
     }
 }
