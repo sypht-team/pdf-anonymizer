@@ -143,8 +143,9 @@ var Substitutions = {}
 function anonymizePart(glyphs) {
     var attempts = 0;
     var avgGlyphLength = distance(glyphs[0].matrix, glyphs[glyphs.length-1].nextMatrix) / glyphs.length;
-    var initialTolerance = 0.2;
-    var tolerance = initialTolerance;
+    var initialTolerance = 0.15;
+    var tolerance = initialTolerance * avgGlyphLength;
+    print("average glyph length is", avgGlyphLength, "tolerance is", tolerance);
     while (true) {
         attempts++;
         var anonymizedText = new Text();
@@ -184,8 +185,7 @@ function anonymizePart(glyphs) {
         } else {
             delta = m[5] - glyphs[glyphs.length-1].nextMatrix[5];
         }
-        delta /= avgGlyphLength;
-        if (distance(m, glyphs[glyphs.length-1].nextMatrix) <= tolerance * avgGlyphLength) {
+        if (distance(m, glyphs[glyphs.length-1].nextMatrix) <= tolerance) {
             print("close enough", delta);
             for (var k in partSubstitutions) {
                 Substitutions[k] = partSubstitutions[k];
@@ -199,7 +199,7 @@ function anonymizePart(glyphs) {
         } else {
             print("too narrow", delta);
         }
-        if (attempts % 100 == 0) {
+        if (attempts % 10 == 0) {
             tolerance *= 1.5;
             print("increasing tolerance to", tolerance);
         }
