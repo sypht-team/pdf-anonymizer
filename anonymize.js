@@ -60,22 +60,23 @@ function advanceMatrix(m, font, glyph, wmode) {
     return m;
 }
 
-function matricesDiffer(m1, m2, tol) {
-    if (tol === undefined) {
-        tol = 1.0;
-    }
-    if (m1.length != m2.length) {
-        return true;
+function distance(m1, m2) {
+    var dx = m2[4] - m1[4];
+    var dy = m2[5] - m1[5];
+    return Math.sqrt(dx*dx + dy*dy);
+}
+
+function matricesDiffer(m1, m2, maxDistance) {
+    if (maxDistance === undefined) {
+        maxDistance = 1.0;
     }
     for (var i = 0; i < 4; ++i) {
         if (m1[i] != m2[i]) {
             return true;
         }
     }
-    for (var i = 4; i < m1.length; ++i) {
-        if (Math.abs(m1[i] - m2[i]) > tol) {
-            return true;
-        }
+    if (distance(m1, m2) > maxDistance) {
+        return true;
     }
     return false;
 }
@@ -98,8 +99,8 @@ function splitText(text) {
     var chunk = [];
     for (var i = 0; i < glyphs.length; ++i) {
         var curr = glyphs[i];
-        var last = chunk[chunk.length-1];
-        if (last !== undefined) {
+        if (chunk.length > 0) {
+            var last = chunk[chunk.length-1];
             if (curr.font != last.font || curr.wmode != last.wmode || matricesDiffer(curr.matrix, last.nextMatrix)) {
                 chunks.push(chunk);
                 chunk = [];
@@ -107,7 +108,7 @@ function splitText(text) {
         }
         chunk.push(curr);
     }
-    if (chunk && chunk.length > 0) {
+    if (chunk.length > 0) {
         chunks.push(chunk);
     }
     for (var i = 0; i < chunks.length; ++i) {
@@ -165,7 +166,7 @@ function anonymizePart(glyphs) {
             anonymizedText.showGlyph(f, m, g, u, v);
             m = advanceMatrix(m, f, g, v);
         }
-        if (!matricesDiffer(m, glyphs[glyphs.length-1].nextMatrix, 2)) {
+        if (distance(m, glyphs[glyphs.length-1].nextMatrix) < 3) {
             for (var k in partSubstitutions) {
                 Substitutions[k] = partSubstitutions[k];
             }
