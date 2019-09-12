@@ -12,7 +12,7 @@ var GlyphReplacementTolerance = 0.1;
 // sequence of glyphs of correct dimensions exceeds BackOffFrequency*sequenceLength,
 // the current value of GlyphReplacementTolerance is multiplied by BackOffAmount.
 // Back off is only applied per token.
-var BackOffFrequency = 5;
+var BackOffFrequency = 10;
 var BackOffAmount = 1.5;
 
 // Determines when a sequence of glyphs should be split into multiple parts. If
@@ -155,7 +155,7 @@ function splitText(text) {
         var curr = glyphs[i];
         if (chunk.length > 0) {
             var last = chunk[chunk.length-1];
-            if (curr.font != last.font || curr.wmode != last.wmode || matricesDiffer(curr.matrix, last.nextMatrix)) {
+            if (String.fromCharCode(last.unicode) == " " || curr.font != last.font || curr.wmode != last.wmode || matricesDiffer(curr.matrix, last.nextMatrix)) {
                 chunks.push(chunk);
                 chunk = [];
             }
