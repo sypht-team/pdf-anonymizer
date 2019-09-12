@@ -253,9 +253,9 @@ function anonymizePart(glyphs, ctm) {
             }
             if (color) {
                 var x1 = Concat(m, ctm)[4];
-                var x2 = Concat(advanceMatrix(m, f, g, v), ctm)[4];
+                var x2 = Concat(advanceMatrix(m, f, g, v), ctm)[4] + Concat(m, ctm)[1];
                 var y1 = Concat(m, ctm)[5];
-                var y2 = Concat(advanceMatrix(m, f, g, v), ctm)[5] - Math.abs(Concat(m, ctm)[0]);
+                var y2 = Concat(advanceMatrix(m, f, g, v), ctm)[5] - Concat(m, ctm)[0];
                 Replacements[substitutionKey] = {"x1": x1, "y1": y1, "x2": x2, "y2": y2, "color": color};
             }
             replaced += String.fromCharCode(u);
