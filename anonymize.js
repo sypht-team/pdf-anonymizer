@@ -142,7 +142,8 @@ var Substitutions = {}
 
 function anonymizePart(glyphs) {
     var attempts = 0;
-    var initialTolerance = 1.0;
+    var partLength = distance(glyphs[0].matrix, glyphs[glyphs.length-1].nextMatrix);
+    var initialTolerance = 0.01;
     var tolerance = initialTolerance;
     while (true) {
         attempts++;
@@ -183,7 +184,8 @@ function anonymizePart(glyphs) {
         } else {
             delta = m[5] - glyphs[glyphs.length-1].nextMatrix[5];
         }
-        if (distance(m, glyphs[glyphs.length-1].nextMatrix) < tolerance) {
+        delta /= partLength;
+        if (distance(m, glyphs[glyphs.length-1].nextMatrix)/partLength < tolerance) {
             print("close enough", delta);
             for (var k in partSubstitutions) {
                 Substitutions[k] = partSubstitutions[k];
