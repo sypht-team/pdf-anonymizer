@@ -92,7 +92,7 @@ function matricesDiffer(m1, m2) {
             return true;
         }
     }
-    if (distance(m1, m2) > MaxGlyphDistance * m1[0]) {
+    if (distance(m1, m2) > MaxGlyphDistance * Math.abs(m1[0])) {
         return true;
     }
     return false;
@@ -173,7 +173,7 @@ function countReplacableCharacters(glyphs) {
 
 function anonymizePart(glyphs, ctm) {
     var attempts = 0;
-    var tolerance = GlyphReplacementTolerance * glyphs[0].matrix[0];
+    var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix[0]);
     print("font size:", glyphs[0].matrix[0], "tolerance:", tolerance);
     while (true) {
         attempts++;
