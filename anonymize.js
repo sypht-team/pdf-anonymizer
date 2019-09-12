@@ -68,14 +68,14 @@ function distance(m1, m2) {
 
 function matricesDiffer(m1, m2, maxDistance) {
     if (maxDistance === undefined) {
-        maxDistance = 1.0;
+        maxDistance = 0.1;
     }
     for (var i = 0; i < 4; ++i) {
         if (m1[i] != m2[i]) {
             return true;
         }
     }
-    if (distance(m1, m2) > maxDistance) {
+    if (distance(m1, m2) > maxDistance * m1[0]) {
         return true;
     }
     return false;
