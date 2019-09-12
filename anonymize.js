@@ -205,6 +205,8 @@ function countReplacableCharacters(glyphs) {
     return count;
 }
 
+var Replacements = {};
+
 function anonymizePart(glyphs, ctm) {
     var attempts = 0;
     var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix[0]);
@@ -220,6 +222,7 @@ function anonymizePart(glyphs, ctm) {
         var replaced = "";
         for (var i = 0; i < glyphs.length; ++i) {
             var u, g = 0;
+            var color = null;
             original += String.fromCharCode(glyphs[i].unicode);
             var substitutionKey = f.getName() + "-" + Concat(glyphs[i].matrix, ctm) + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + v;
             if (substitutionKey in Substitutions) {
@@ -228,16 +231,26 @@ function anonymizePart(glyphs, ctm) {
             } else if (glyphInWhitelist(glyphs[i], ctm)) {
                 u = glyphs[i].unicode;
                 g = glyphs[i].glyph;
+                color = [0, 0, 1];
             } else {
                 while (!g) {
                     u = anonymizeUnicode(glyphs[i].unicode);
                     if (u == glyphs[i].unicode) {
                         g = glyphs[i].glyph;
+                        color = [0, 1, 1];
                         break;
                     } else {
+                        color = [0, 1, 0];
                         g = CharacterMap[f.getName()][u];
                     }
                 }
+            }
+            if (color) {
+                var x1 = Concat(m, ctm)[4];
+                var x2 = Concat(advanceMatrix(m, f, g, v), ctm)[4];
+                var y1 = Concat(m, ctm)[5];
+                var y2 = Concat(advanceMatrix(m, f, g, v), ctm)[5] - Math.abs(Concat(m, ctm)[0]);
+                Replacements[substitutionKey] = {"x1": x1, "y1": y1, "x2": x2, "y2": y2, "color": color};
             }
             replaced += String.fromCharCode(u);
             partSubstitutions[substitutionKey] = [u, g];
@@ -348,6 +361,14 @@ function AnonymizingDrawDevice(transform, pixmap) {
 }
 var anonymizingDevice = new AnonymizingDrawDevice(Identity, pixmap);
 page.run(anonymizingDevice, scaleMatrix);
-anonymizingDevice.close()
-
 pixmap.saveAsPNG(scriptArgs[2]);
+
+for (var k in Replacements) {
+    var r = Replacements[k];
+    var p = new Path();
+    p.rect(r.x1, r.y1, r.x2, r.y2);
+    anonymizingDevice.fillPath(p, true, Identity, DeviceRGB, r.color, 0.3);
+}
+
+pixmap.saveAsPNG(scriptArgs[2].replace(".png", ".info.png"));
+anonymizingDevice.close()
