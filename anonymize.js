@@ -142,7 +142,7 @@ var Substitutions = {}
 
 function anonymizePart(glyphs) {
     var attempts = 0;
-    var initialTolerance = 0.075;
+    var initialTolerance = 0.1;
     var tolerance = initialTolerance * glyphs[0].matrix[0];
     print("font size:", glyphs[0].matrix[0], "tolerance:", tolerance);
     while (true) {
