@@ -199,7 +199,7 @@ function anonymizePart(glyphs) {
         } else {
             print("too narrow", delta);
         }
-        if (attempts % 10 == 0) {
+        if (attempts % (10*glyphs.length) == 0) {
             tolerance *= 1.5;
             print("increasing tolerance to", tolerance);
         }
