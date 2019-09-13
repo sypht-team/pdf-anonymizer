@@ -220,6 +220,7 @@ function anonymizePart(glyphs, ctm) {
         var m = glyphs[0].matrix;
         var v = glyphs[0].wmode;
         var partSubstitutions = {};
+        var tmpReplacements = {};
         var original = "";
         for (var i = 0; i < glyphs.length; ++i) {
             original += String.fromCharCode(glyphs[i].unicode);
@@ -232,7 +233,8 @@ function anonymizePart(glyphs, ctm) {
             if (substitutionKey in Substitutions) {
                 u = Substitutions[substitutionKey][0];
                 g = Substitutions[substitutionKey][1];
-                Replacements[substitutionKey].color = [1, 1, 0];
+                tmpReplacements[substitutionKey] = Replacements[substitutionKey];
+                tmpReplacements[substitutionKey].color = [1, 1, 0];
             } else {
                 if (glyphInWhitelist(glyphs[i], ctm)) {
                     u = glyphs[i].unicode;
@@ -263,10 +265,10 @@ function anonymizePart(glyphs, ctm) {
                 vertices.push([Concat(m, ctm)[4] + Concat(m, ctm)[1], Concat(m, ctm)[5] - Concat(m, ctm)[0]]);
                 vertices.push([Concat(advanceMatrix(m, f, g, v), ctm)[4] + Concat(advanceMatrix(m, f, g, v), ctm)[1], Concat(advanceMatrix(m, f, g, v), ctm)[5] - Concat(advanceMatrix(m, f, g, v), ctm)[0]]);
                 vertices.push([Concat(advanceMatrix(m, f, g, v), ctm)[4], Concat(advanceMatrix(m, f, g, v), ctm)[5]]);
-                Replacements[substitutionKey] = {"color": color, "vertices": vertices};
+                tmpReplacements[substitutionKey] = {"color": color, "vertices": vertices};
+                partSubstitutions[substitutionKey] = [u, g];
             }
             replaced += String.fromCharCode(u);
-            partSubstitutions[substitutionKey] = [u, g];
             anonymizedText.showGlyph(f, m, g, u, v);
             m = advanceMatrix(m, f, g, v);
         }
@@ -281,6 +283,9 @@ function anonymizePart(glyphs, ctm) {
             print("close enough", delta);
             for (var k in partSubstitutions) {
                 Substitutions[k] = partSubstitutions[k];
+            }
+            for (var k in tmpReplacements) {
+                Replacements[k] = tmpReplacements[k];
             }
             print("attempts:", attempts);
             print("\n");
