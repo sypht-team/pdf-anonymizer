@@ -183,17 +183,6 @@ function GlyphMatrix(m, maxGlyphDistance) {
         return new GlyphMatrix(Concat(this.m, ctm));
     }
 
-    this.vertices = function(other, ctm) {
-        var t = this.transform(ctm);
-        var a = other.transform(ctm);
-        var vertices = [];
-        vertices.push([t.m[4], t.m[5]]);
-        vertices.push([t.m[4] + t.m[1], t.m[5] - t.m[0]]);
-        vertices.push([a.m[4] + a.m[1], a.m[5] - a.m[0]]);
-        vertices.push([a.m[4], a.m[5]]);
-        return vertices;
-    }
-
 }
 
 function Glyph(f, m, g, u, v, ctm, color, alpha) {
@@ -228,8 +217,19 @@ function Glyph(f, m, g, u, v, ctm, color, alpha) {
         return new Glyph(this.font, glyph.nextMatrix.m, this.glyph, this.unicode, this.wmode, this.ctm, this.color, this.alpha);
     }
 
+    this.vertices = function() {
+        var t = this.matrix.transform(this.ctm);
+        var a = this.nextMatrix.transform(this.ctm);
+        var vertices = [];
+        vertices.push([t.m[4], t.m[5]]);
+        vertices.push([t.m[4] + t.m[1], t.m[5] - t.m[0]]);
+        vertices.push([a.m[4] + a.m[1], a.m[5] - a.m[0]]);
+        vertices.push([a.m[4], a.m[5]]);
+        return vertices;
+    }
+
     this.isWithin = function(zones) {
-        var points = this.matrix.vertices(this.nextMatrix, this.ctm);
+        var points = this.vertices();
         var avgX = 0, avgY = 0;
         for (var i = 0; i < points.length; ++i) {
             avgX += points[i][0] / points.length;
@@ -339,11 +339,11 @@ function generateText(glyphs) {
         if (glyphs[i].key() in Replacements) {
             r = Replacements[glyphs[i].key()];
         } else {
-            if (i == 0) {
-                r = glyphs[i].randomize(ZoneWhitelist, CharWhitelist, CharacterMap);
-            } else {
-                r = glyphs[i].placeAfter(replacements[i-1]).randomize(ZoneWhitelist, CharWhitelist, CharacterMap);
+            r = glyphs[i];
+            if (i > 0) {
+                r = r.placeAfter(replacements[i-1]);
             }
+            r = r.randomize(ZoneWhitelist, CharWhitelist, CharacterMap);
         }
         replacements.push(r);
         text.showGlyph(r.font, r.matrix.m, r.glyph, r.unicode, r.wmode);
@@ -469,7 +469,7 @@ pixmap.saveAsPNG(scriptArgs[2]);
 
 for (var k in Replacements) {
     var r = Replacements[k];
-    var v = r.matrix.vertices(r.nextMatrix, r.ctm)
+    var v = r.vertices();
     var p = new Path();
     p.moveTo(v[v.length-1][0], v[v.length-1][1])
     for (var j = 0; j < v.length; ++j) {
