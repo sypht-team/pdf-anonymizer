@@ -90,13 +90,29 @@ var SubstitutionGroups = {
     digit: "012345678901200",
 };
 
+var FontSubstitutionGroups = {};
+for (var fontName in CharacterMap) {
+    FontSubstitutionGroups[fontName] = {};
+    for (var group in SubstitutionGroups) {
+        FontSubstitutionGroups[fontName][group] = "";
+        var characters = SubstitutionGroups[group];
+        for (var i = 0; i < characters.length; ++i) {
+            var chr = characters[i];
+            var uni = chr.charCodeAt(0);
+            if (uni in CharacterMap[fontName]) {
+                FontSubstitutionGroups[fontName][group] += chr;
+            }
+        }
+    }
+}
+
 var WhitelistCharacters = " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
 
-function anonymizeUnicode(u) {
-    for (var group in SubstitutionGroups) {
-        var chars = SubstitutionGroups[group];
-        if (chars.indexOf(String.fromCharCode(u)) >= 0) {
-            return chars[parseInt(Math.random()*chars.length)].charCodeAt(0);
+function anonymizeUnicode(fontName, u) {
+    for (var group in FontSubstitutionGroups[fontName]) {
+        var characters = FontSubstitutionGroups[fontName][group];
+        if (characters.indexOf(String.fromCharCode(u)) >= 0) {
+            return characters[parseInt(Math.random()*characters.length)].charCodeAt(0);
         }
     }
     return u;
@@ -252,16 +268,12 @@ function anonymizePart(glyphs, ctm) {
                 g = glyphs[i].glyph;
                 color = [0, 1, 0];
             } else {
-                while (!g) {
-                    u = anonymizeUnicode(glyphs[i].unicode);
-                    if (u == glyphs[i].unicode) {
-                        g = glyphs[i].glyph;
-                        color = [0, 1, 1];
-                        break;
-                    } else {
-                        g = CharacterMap[f.getName()][u];
-                        color = [0, 1, 0];
-                    }
+                u = anonymizeUnicode(f.getName(), glyphs[i].unicode);
+                g = CharacterMap[f.getName()][u];
+                if (u == glyphs[i].unicode) {
+                    color = [0, 1, 1];
+                } else {
+                    color = [0, 1, 0];
                 }
             }
             if (WhitelistCharacters.indexOf(String.fromCharCode(u)) < 0 && Object.keys(CharacterMap[f.getName()]).length <= 10) {
