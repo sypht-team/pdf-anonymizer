@@ -54,9 +54,7 @@ function loadAnnotations(width, height) {
 var ZoneWhitelist = loadAnnotations(pixmap.getWidth(), pixmap.getHeight());
 
 function glyphInZoneWhitelist(glyph, ctm) {
-    var currM = Concat(glyph.matrix, ctm);
-    var nextM = Concat(glyph.nextMatrix, ctm);
-    var points = getVertices(currM, nextM, ctm);
+    var points = glyph.matrix.vertices(glyph.nextMatrix, ctm);
     var avgX = 0, avgY = 0;
     for (var i = 0; i < points.length; ++i) {
         avgX += points[i][0] / points.length;
@@ -166,47 +164,60 @@ function anonymizeUnicode(fontName, unicode) {
 
 // Matrices/geometry
 
-function advanceMatrix(m, font, glyph, wmode) {
-    var adv = font.advanceGlyph(glyph, wmode);
-    var tx = 0, ty = 0;
-    if (wmode == 0) {
-        tx = adv;
-    } else {
-        ty = -adv;
+function GlyphMatrix(m, maxGlyphDistance) {
+
+    // Transform with 6 elements.
+    this.m = m;
+
+    if (maxGlyphDistance === undefined) {
+        maxGlyphDistance = MaxGlyphDistance;
     }
-    var m = m.slice();
-    m[4] += tx * m[0] + ty * m[2];
-    m[5] += tx * m[1] + ty * m[3];
-    return m;
-}
+    this.maxGlyphDistance = maxGlyphDistance;
 
-function distance(m1, m2) {
-    var dx = m2[4] - m1[4];
-    var dy = m2[5] - m1[5];
-    return Math.sqrt(dx*dx + dy*dy);
-}
-
-function matricesDiffer(m1, m2) {
-    for (var i = 0; i < 4; ++i) {
-        if (m1[i] != m2[i]) {
-            return true;
+    this.advance = function(font, glyph, wmode) {
+        var adv = font.advanceGlyph(glyph, wmode);
+        var tx = 0, ty = 0;
+        if (wmode == 0) {
+            tx = adv;
+        } else {
+            ty = -adv;
         }
+        var m = this.m.slice();
+        m[4] += tx * m[0] + ty * m[2];
+        m[5] += tx * m[1] + ty * m[3];
+        return new GlyphMatrix(m);
     }
-    if (distance(m1, m2) > MaxGlyphDistance * Math.abs(m1[0])) {
-        return true;
-    }
-    return false;
-}
 
-function getVertices(m, am, ctm) {
-    m = Concat(m, ctm);
-    am = Concat(am, ctm);
-    var vertices = [];
-    vertices.push([m[4], m[5]]);
-    vertices.push([m[4] + m[1], m[5] - m[0]]);
-    vertices.push([am[4] + am[1], am[5] - am[0]]);
-    vertices.push([am[4], am[5]]);
-    return vertices;
+    this.distance = function(other) {
+        var dx = other.m[4] - this.m[4];
+        var dy = other.m[5] - this.m[5];
+        return Math.sqrt(dx*dx + dy*dy);
+    }
+
+    this.equals = function(other) {
+        for (var i = 0; i < 4; ++i) {
+            if (this.m[i] != other.m[i]) {
+                return false;
+            }
+        }
+        return this.distance(other) <= this.maxGlyphDistance * Math.abs(this.m[0])
+    }
+
+    this.transform = function(ctm) {
+        return new GlyphMatrix(Concat(this.m, ctm));
+    }
+
+    this.vertices = function(other, ctm) {
+        var t = this.transform(ctm);
+        var a = other.transform(ctm);
+        var vertices = [];
+        vertices.push([t.m[4], t.m[5]]);
+        vertices.push([t.m[4] + t.m[1], t.m[5] - t.m[0]]);
+        vertices.push([a.m[4] + a.m[1], a.m[5] - a.m[0]]);
+        vertices.push([a.m[4], a.m[5]]);
+        return vertices;
+    }
+
 }
 
 // Text manipulation
@@ -215,10 +226,11 @@ function splitText(text) {
     var glyphs = []
     text.walk({
         showGlyph: function (f, m, g, u, v) {
+            var matrix = new GlyphMatrix(m);
             glyphs.push({
                 "font": f, 
-                "matrix": m,
-                "nextMatrix": advanceMatrix(m, f, g, v),
+                "matrix": matrix,
+                "nextMatrix": matrix.advance(f, g, v),
                 "glyph": g,
                 "unicode": u,
                 "wmode": v
@@ -231,7 +243,7 @@ function splitText(text) {
         var curr = glyphs[i];
         if (chunk.length > 0) {
             var last = chunk[chunk.length-1];
-            if (String.fromCharCode(last.unicode) == " " || curr.font != last.font || curr.wmode != last.wmode || matricesDiffer(curr.matrix, last.nextMatrix)) {
+            if (String.fromCharCode(last.unicode) == " " || curr.font != last.font || curr.wmode != last.wmode || !curr.matrix.equals(last.nextMatrix)) {
                 chunks.push(chunk);
                 chunk = [];
             }
@@ -255,13 +267,13 @@ var Replacements = {};
 function generateText(glyphs, ctm) {
     var text = new Text();
     var f = glyphs[0].font;
-    var m = glyphs[0].matrix;
+    var matrix = glyphs[0].matrix;
     var v = glyphs[0].wmode;
     var replacements = {};
     var string = "";
     for (var i = 0; i < glyphs.length; ++i) {
         var u, g, color;
-        var substitutionKey = glyphs[i].font.getName() + "-" + Concat(glyphs[i].matrix, ctm) + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + glyphs[i].wmode;
+        var substitutionKey = glyphs[i].font.getName() + "-" + glyphs[i].matrix.transform(ctm).m + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + glyphs[i].wmode;
         if (substitutionKey in Replacements) {
             u = Replacements[substitutionKey].unicode;
             g = Replacements[substitutionKey].glyph;
@@ -285,17 +297,17 @@ function generateText(glyphs, ctm) {
                 color = [0, 1, 0];
             }
         }
-        replacements[substitutionKey] = {"color": color, "vertices": getVertices(m, advanceMatrix(m, f, g, v), ctm), "unicode": u, "glyph": g};
+        replacements[substitutionKey] = {"color": color, "vertices": matrix.vertices(matrix.advance(f, g, v), ctm), "unicode": u, "glyph": g};
         string += String.fromCharCode(u);
-        text.showGlyph(f, m, g, u, v);
-        m = advanceMatrix(m, f, g, v);
+        text.showGlyph(f, matrix.m, g, u, v);
+        matrix = matrix.advance(f, g, v);
     }
-    return {"text": text, "string": string, "replacements": replacements, "distance": distance(m, glyphs[glyphs.length-1].nextMatrix)};
+    return {"text": text, "string": string, "replacements": replacements, "distance": matrix.distance(glyphs[glyphs.length-1].nextMatrix)};
 }
 
 function anonymizeChunk(glyphs, ctm) {
     var attempts = 0;
-    var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix[0]);
+    var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix.m[0]);
     var original = "";
     for (var i = 0; i < glyphs.length; ++i) {
         original += String.fromCharCode(glyphs[i].unicode);
