@@ -307,6 +307,15 @@ function textToGlyphs(text, ctm) {
     return glyphs;
 }
 
+function glyphsToText(glyphs) {
+    var text = new Text();
+    for (var i = 0; i < glyphs.length; ++i) {
+        var g = glyphs[i];
+        text.showGlyph(g.font, g.matrix.m, g.glyph, g.unicode, g.wmode);
+    }
+    return text;
+}
+
 function splitText(text, ctm) {
     var glyphs = textToGlyphs(text, ctm);
     var chunks = [];
@@ -331,7 +340,6 @@ function splitText(text, ctm) {
 var Replacements = {};
 
 function generateText(glyphs) {
-    var text = new Text();
     var replacements = [];
     var string = "";
     for (var i = 0; i < glyphs.length; ++i) {
@@ -346,11 +354,10 @@ function generateText(glyphs) {
             r = r.randomize(ZoneWhitelist, CharWhitelist, CharacterMap);
         }
         replacements.push(r);
-        text.showGlyph(r.font, r.matrix.m, r.glyph, r.unicode, r.wmode);
         string += r.string;
     }
     var distance = replacements[replacements.length-1].nextMatrix.distance(glyphs[glyphs.length-1].nextMatrix);
-    return {"text": text, "replacements": replacements, "distance": distance, "string": string};
+    return {"replacements": replacements, "distance": distance, "string": string};
 }
 
 function anonymizeChunk(glyphs) {
@@ -371,7 +378,7 @@ function anonymizeChunk(glyphs) {
             }
             print("attempts:", attempts);
             print("\n");
-            return generated.text;
+            return glyphsToText(generated.replacements);
         }
         if (attempts % (BackOffFrequency * glyphs.length) == 0) {
             tolerance *= BackOffAmount;
