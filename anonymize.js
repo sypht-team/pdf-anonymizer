@@ -33,37 +33,50 @@ var page = doc.loadPage(parseInt(scriptArgs[1])-1);
 var pixmap = page.toPixmap(scaleMatrix, DeviceRGB);
 pixmap.clear(255);
 
-var whitelist = [];
-try {
-    whitelist = read(scriptArgs[0].replace(".pdf", ".json"));
-    whitelist = JSON.parse(whitelist);
-    for (var i = 0; i < whitelist.length; ++i) {
-        whitelist[i].x1 *= pixmap.getWidth();
-        whitelist[i].x2 *= pixmap.getWidth();
-        whitelist[i].y1 *= pixmap.getHeight();
-        whitelist[i].y2 *= pixmap.getHeight();
+// Whitelists
+
+function loadAnnotations(width, height) {
+    try {
+        var annotations = read(scriptArgs[0].replace(".pdf", ".json"));
+    } catch (err) {
+        return [];
     }
-} catch (err) {
-    // pass
+    annotations = JSON.parse(annotations);
+    for (var i = 0; i < annotations.length; ++i) {
+        annotations[i].x1 *= width;
+        annotations[i].y1 *= height;
+        annotations[i].x2 *= width;
+        annotations[i].y2 *= height;
+    }
+    return annotations;
 }
 
-function glyphInWhitelist(glyph, ctm) {
+var ZoneWhitelist = loadAnnotations(pixmap.getWidth(), pixmap.getHeight());
+
+function glyphInZoneWhitelist(glyph, ctm) {
     var currM = Concat(glyph.matrix, ctm);
     var nextM = Concat(glyph.nextMatrix, ctm);
     var x = [currM[4], nextM[4], (currM[4] + nextM[4])/2];
     var y = [currM[5], nextM[5], (currM[5] + nextM[5])/2];
-    for (var i = 0; i < whitelist.length; ++i) {
-        var a = whitelist[i];
+    for (var i = 0; i < ZoneWhitelist.length; ++i) {
+        var zone = ZoneWhitelist[i];
         for (var j = 0; j < x.length; ++j) {
             var x0 = x[j];
             var y0 = y[j];
-            if (x0 >= a.x1 && x0 <= a.x2 && y0 >= a.y1 && y0 <= a.y2) {
+            if (x0 >= zone.x1 && x0 <= zone.x2 && y0 >= zone.y1 && y0 <= zone.y2) {
                 return true;
             }
         }
     }
     return false;
 }
+
+var CharWhitelist = " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+function glyphInCharWhitelist(glyph) {
+    return CharWhitelist.indexOf(String.fromCharCode(glyph.unicode)) >= 0;
+}
+
+// Font/character substitutions
 
 var CharacterMap = {};
 var analyzeCharacters = {
@@ -106,17 +119,47 @@ for (var fontName in CharacterMap) {
     }
 }
 
-var WhitelistCharacters = " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+function unique(characters) {
+    var uniqueCharacters = "";
+    for (var i = 0; i < characters.length; ++i) {
+        if (uniqueCharacters.indexOf(characters[i]) < 0) {
+            uniqueCharacters += characters[i];
+        }
+    }
+    return uniqueCharacters;
+}
 
-function anonymizeUnicode(fontName, u) {
+var FontSubstitutionGroupScores = {};
+for (var fontName in CharacterMap) {
+    FontSubstitutionGroupScores[fontName] = {}
+    for (var group in FontSubstitutionGroups[fontName]) {
+        var fontCharacters = unique(FontSubstitutionGroups[fontName][group]);
+        var characters = unique(SubstitutionGroups[group]);
+        FontSubstitutionGroupScores[fontName][group] = fontCharacters.length / characters.length;
+    }
+}
+
+function anonymizingPoolScore(fontName, unicode) {
     for (var group in FontSubstitutionGroups[fontName]) {
         var characters = FontSubstitutionGroups[fontName][group];
-        if (characters.indexOf(String.fromCharCode(u)) >= 0) {
+        if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {
+            return FontSubstitutionGroupScores[fontName][group];
+        }
+    }
+    return 0;
+}
+
+function anonymizeUnicode(fontName, unicode) {
+    for (var group in FontSubstitutionGroups[fontName]) {
+        var characters = FontSubstitutionGroups[fontName][group];
+        if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {
             return characters[parseInt(Math.random()*characters.length)].charCodeAt(0);
         }
     }
-    return u;
+    return unicode;
 }
+
+// Matrices/geometry
 
 function advanceMatrix(m, font, glyph, wmode) {
     var adv = font.advanceGlyph(glyph, wmode);
@@ -149,6 +192,20 @@ function matricesDiffer(m1, m2) {
     }
     return false;
 }
+
+function getVertices(m, ctm, font, glyph, wmode) {
+    var am = advanceMatrix(m, font, glyph, wmode);
+    var vertices = [];
+    m = Concat(m, ctm);
+    am = Concat(am, ctm);
+    vertices.push([m[4], m[5]]);
+    vertices.push([m[4] + m[1], m[5] - m[0]]);
+    vertices.push([am[4] + am[1], am[5] - am[0]]);
+    vertices.push([am[4], am[5]]);
+    return vertices;
+}
+
+// Text manipulation
 
 function splitText(text) {
     var glyphs = []
@@ -189,62 +246,12 @@ function splitText(text) {
     return chunks;
 }
 
-function mergeParts(parts) {
+function mergeChunks(chunks) {
     var text = new Text();
-    for (var i = 0; i < parts.length; ++i) {
-        parts[i].walk(text);
+    for (var i = 0; i < chunks.length; ++i) {
+        chunks[i].walk(text);
     }
     return text;
-}
-
-function anonymizeText(text, ctm) {
-    var parts = splitText(text);
-    for (var i = 0; i < parts.length; ++i) {
-        parts[i] = anonymizePart(parts[i], ctm);
-    }
-    return mergeParts(parts);
-}
-
-function getVertices(m, ctm, font, glyph, wmode) {
-    var am = advanceMatrix(m, font, glyph, wmode);
-    var vertices = [];
-    m = Concat(m, ctm);
-    am = Concat(am, ctm);
-    vertices.push([m[4], m[5]]);
-    vertices.push([m[4] + m[1], m[5] - m[0]]);
-    vertices.push([am[4] + am[1], am[5] - am[0]]);
-    vertices.push([am[4], am[5]]);
-    return vertices;
-}
-
-function unique(characters) {
-    var uniqueCharacters = "";
-    for (var i = 0; i < characters.length; ++i) {
-        if (uniqueCharacters.indexOf(characters[i]) < 0) {
-            uniqueCharacters += characters[i];
-        }
-    }
-    return uniqueCharacters;
-}
-
-var FontSubstitutionGroupScores = {};
-for (var fontName in CharacterMap) {
-    FontSubstitutionGroupScores[fontName] = {}
-    for (var group in FontSubstitutionGroups[fontName]) {
-        var fontCharacters = unique(FontSubstitutionGroups[fontName][group]);
-        var characters = unique(SubstitutionGroups[group]);
-        FontSubstitutionGroupScores[fontName][group] = fontCharacters.length / characters.length;
-    }
-}
-
-function anonymizingPoolScore(fontName, unicode) {
-    for (var group in FontSubstitutionGroups[fontName]) {
-        var characters = FontSubstitutionGroups[fontName][group];
-        if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {
-            return FontSubstitutionGroupScores[fontName][group];
-        }
-    }
-    return 0;
 }
 
 var Replacements = {};
@@ -263,11 +270,11 @@ function generateText(glyphs, ctm) {
             u = Replacements[substitutionKey].unicode;
             g = Replacements[substitutionKey].glyph;
             color = [1, 1, 0];
-        } else if (glyphInWhitelist(glyphs[i], ctm)) {
+        } else if (glyphInZoneWhitelist(glyphs[i], ctm)) {
             u = glyphs[i].unicode;
             g = glyphs[i].glyph;
             color = [0, 0, 1];
-        } else if (WhitelistCharacters.indexOf(String.fromCharCode(glyphs[i].unicode)) >= 0) {
+        } else if (glyphInCharWhitelist(glyphs[i])) {
             u = glyphs[i].unicode;
             g = glyphs[i].glyph;
             color = [0, 1, 0];
@@ -290,7 +297,7 @@ function generateText(glyphs, ctm) {
     return {"text": text, "string": string, "replacements": replacements, "distance": distance(m, glyphs[glyphs.length-1].nextMatrix)};
 }
 
-function anonymizePart(glyphs, ctm) {
+function anonymizeChunk(glyphs, ctm) {
     var attempts = 0;
     var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix[0]);
     var original = "";
@@ -315,6 +322,14 @@ function anonymizePart(glyphs, ctm) {
             print("increasing tolerance to", tolerance);
         }
     }
+}
+
+function anonymizeText(text, ctm) {
+    var parts = splitText(text);
+    for (var i = 0; i < parts.length; ++i) {
+        parts[i] = anonymizeChunk(parts[i], ctm);
+    }
+    return mergeChunks(parts);
 }
 
 // We cannot use inheritence to extend DrawDevice, since it is a native
