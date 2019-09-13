@@ -219,12 +219,46 @@ function getVertices(m, ctm, font, glyph, wmode) {
     return vertices;
 }
 
+function unique(characters) {
+    var uniqueCharacters = "";
+    for (var i = 0; i < characters.length; ++i) {
+        if (uniqueCharacters.indexOf(characters[i]) < 0) {
+            uniqueCharacters += characters[i];
+        }
+    }
+    return uniqueCharacters;
+}
+
+var FontSubstitutionGroupScores = {};
+for (var fontName in CharacterMap) {
+    FontSubstitutionGroupScores[fontName] = {}
+    for (var group in FontSubstitutionGroups[fontName]) {
+        var fontCharacters = unique(FontSubstitutionGroups[fontName][group]);
+        var characters = unique(SubstitutionGroups[group]);
+        FontSubstitutionGroupScores[fontName][group] = fontCharacters.length / characters.length;
+    }
+}
+
+function anonymizingPoolScore(fontName, unicode) {
+    for (var group in FontSubstitutionGroups[fontName]) {
+        var characters = FontSubstitutionGroups[fontName][group];
+        if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {
+            return FontSubstitutionGroupScores[fontName][group];
+        }
+    }
+    return 0;
+}
+
 var Replacements = {};
 
 function anonymizePart(glyphs, ctm) {
     var attempts = 0;
     var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix[0]);
     print("font size:", glyphs[0].matrix[0], "tolerance:", tolerance);
+    var original = "";
+    for (var i = 0; i < glyphs.length; ++i) {
+        original += String.fromCharCode(glyphs[i].unicode);
+    }
     while (true) {
         attempts++;
         var anonymizedText = new Text();
@@ -232,14 +266,9 @@ function anonymizePart(glyphs, ctm) {
         var m = glyphs[0].matrix;
         var v = glyphs[0].wmode;
         var tmpReplacements = {};
-        var original = "";
-        for (var i = 0; i < glyphs.length; ++i) {
-            original += String.fromCharCode(glyphs[i].unicode);
-        }
         var replaced = "";
         for (var i = 0; i < glyphs.length; ++i) {
-            var u, g = 0;
-            var color = null;
+            var u, g, color;
             var substitutionKey = glyphs[i].font.getName() + "-" + Concat(glyphs[i].matrix, ctm) + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + glyphs[i].wmode;
             if (substitutionKey in Replacements) {
                 u = Replacements[substitutionKey].unicode;
@@ -256,14 +285,13 @@ function anonymizePart(glyphs, ctm) {
             } else {
                 u = anonymizeUnicode(f.getName(), glyphs[i].unicode);
                 g = CharacterMap[f.getName()][u];
-                if (u == glyphs[i].unicode) {
+                if (anonymizingPoolScore(f.getName(), u) < 0.5) {
+                    color = [1, 0, 0];
+                } else if (u == glyphs[i].unicode) {
                     color = [0, 1, 1];
                 } else {
                     color = [0, 1, 0];
                 }
-            }
-            if (WhitelistCharacters.indexOf(String.fromCharCode(u)) < 0 && Object.keys(CharacterMap[f.getName()]).length <= 10) {
-                color = [1, 0, 0];
             }
             tmpReplacements[substitutionKey] = {"color": color, "vertices": getVertices(m, ctm, f, g, v), "unicode": u, "glyph": g};
             replaced += String.fromCharCode(u);
