@@ -191,8 +191,6 @@ function anonymizeText(text, ctm) {
     return mergeParts(parts);
 }
 
-var Substitutions = {}
-
 function countReplacableCharacters(glyphs) {
     var count = 0;
     for (var i = 0; i < glyphs.length; ++i) {
@@ -219,7 +217,6 @@ function anonymizePart(glyphs, ctm) {
         var f = glyphs[0].font;
         var m = glyphs[0].matrix;
         var v = glyphs[0].wmode;
-        var partSubstitutions = {};
         var tmpReplacements = {};
         var original = "";
         for (var i = 0; i < glyphs.length; ++i) {
@@ -230,9 +227,9 @@ function anonymizePart(glyphs, ctm) {
             var u, g = 0;
             var color = null;
             var substitutionKey = glyphs[i].font.getName() + "-" + Concat(glyphs[i].matrix, ctm) + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + glyphs[i].wmode;
-            if (substitutionKey in Substitutions) {
-                u = Substitutions[substitutionKey][0];
-                g = Substitutions[substitutionKey][1];
+            if (substitutionKey in Replacements) {
+                u = Replacements[substitutionKey].unicode;
+                g = Replacements[substitutionKey].glyph;
                 tmpReplacements[substitutionKey] = Replacements[substitutionKey];
                 tmpReplacements[substitutionKey].color = [1, 1, 0];
             } else {
@@ -265,8 +262,7 @@ function anonymizePart(glyphs, ctm) {
                 vertices.push([Concat(m, ctm)[4] + Concat(m, ctm)[1], Concat(m, ctm)[5] - Concat(m, ctm)[0]]);
                 vertices.push([Concat(advanceMatrix(m, f, g, v), ctm)[4] + Concat(advanceMatrix(m, f, g, v), ctm)[1], Concat(advanceMatrix(m, f, g, v), ctm)[5] - Concat(advanceMatrix(m, f, g, v), ctm)[0]]);
                 vertices.push([Concat(advanceMatrix(m, f, g, v), ctm)[4], Concat(advanceMatrix(m, f, g, v), ctm)[5]]);
-                tmpReplacements[substitutionKey] = {"color": color, "vertices": vertices};
-                partSubstitutions[substitutionKey] = [u, g];
+                tmpReplacements[substitutionKey] = {"color": color, "vertices": vertices, "unicode": u, "glyph": g};
             }
             replaced += String.fromCharCode(u);
             anonymizedText.showGlyph(f, m, g, u, v);
@@ -281,9 +277,6 @@ function anonymizePart(glyphs, ctm) {
         }
         if (countReplacableCharacters(glyphs) == 0 || distance(m, glyphs[glyphs.length-1].nextMatrix) <= tolerance) {
             print("close enough", delta);
-            for (var k in partSubstitutions) {
-                Substitutions[k] = partSubstitutions[k];
-            }
             for (var k in tmpReplacements) {
                 Replacements[k] = tmpReplacements[k];
             }
