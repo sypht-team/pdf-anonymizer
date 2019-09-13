@@ -242,35 +242,34 @@ function anonymizePart(glyphs, ctm) {
             if (substitutionKey in Replacements) {
                 u = Replacements[substitutionKey].unicode;
                 g = Replacements[substitutionKey].glyph;
-                tmpReplacements[substitutionKey] = Replacements[substitutionKey];
-                tmpReplacements[substitutionKey].color = [1, 1, 0];
+                color = [1, 1, 0];
             } else {
                 if (glyphInWhitelist(glyphs[i], ctm)) {
                     u = glyphs[i].unicode;
                     g = glyphs[i].glyph;
                     color = [0, 0, 1];
+                } else if (WhitelistCharacters.indexOf(String.fromCharCode(glyphs[i].unicode)) >= 0) {
+                    u = glyphs[i].unicode;
+                    g = glyphs[i].glyph;
+                    color = [0, 1, 0];
                 } else {
                     while (!g) {
                         u = anonymizeUnicode(glyphs[i].unicode);
                         if (u == glyphs[i].unicode) {
                             g = glyphs[i].glyph;
-                            if (WhitelistCharacters.indexOf(String.fromCharCode(glyphs[i].unicode)) >= 0) {
-                                color = [0, 1, 0];
-                            } else {
-                                color = [0, 1, 1];
-                            }
+                            color = [0, 1, 1];
                             break;
                         } else {
-                            color = [0, 1, 0];
                             g = CharacterMap[f.getName()][u];
+                            color = [0, 1, 0];
                         }
                     }
                 }
-                if (WhitelistCharacters.indexOf(String.fromCharCode(u)) < 0 && Object.keys(CharacterMap[f.getName()]).length <= 10) {
-                    color = [1, 0, 0];
-                }
-                tmpReplacements[substitutionKey] = {"color": color, "vertices": getVertices(m, ctm, f, g, v), "unicode": u, "glyph": g};
             }
+            if (WhitelistCharacters.indexOf(String.fromCharCode(u)) < 0 && Object.keys(CharacterMap[f.getName()]).length <= 10) {
+                color = [1, 0, 0];
+            }
+            tmpReplacements[substitutionKey] = {"color": color, "vertices": getVertices(m, ctm, f, g, v), "unicode": u, "glyph": g};
             replaced += String.fromCharCode(u);
             anonymizedText.showGlyph(f, m, g, u, v);
             m = advanceMatrix(m, f, g, v);
