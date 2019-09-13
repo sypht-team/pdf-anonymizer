@@ -255,17 +255,15 @@ function anonymizePart(glyphs, ctm) {
                     }
                 }
             }
-            if (color) {
-                if (WhitelistCharacters.indexOf(String.fromCharCode(u)) < 0 && Object.keys(CharacterMap[f.getName()]).length <= 10) {
-                    color = [1, 0, 0];
-                }
-                var vertices = [];
-                vertices.push([Concat(m, ctm)[4], Concat(m, ctm)[5]]);
-                vertices.push([Concat(m, ctm)[4] + Concat(m, ctm)[1], Concat(m, ctm)[5] - Concat(m, ctm)[0]]);
-                vertices.push([Concat(advanceMatrix(m, f, g, v), ctm)[4] + Concat(advanceMatrix(m, f, g, v), ctm)[1], Concat(advanceMatrix(m, f, g, v), ctm)[5] - Concat(advanceMatrix(m, f, g, v), ctm)[0]]);
-                vertices.push([Concat(advanceMatrix(m, f, g, v), ctm)[4], Concat(advanceMatrix(m, f, g, v), ctm)[5]]);
-                Replacements[substitutionKey] = {"color": color, "vertices": vertices};
+            if (WhitelistCharacters.indexOf(String.fromCharCode(u)) < 0 && Object.keys(CharacterMap[f.getName()]).length <= 10) {
+                color = [1, 0, 0];
             }
+            var vertices = [];
+            vertices.push([Concat(m, ctm)[4], Concat(m, ctm)[5]]);
+            vertices.push([Concat(m, ctm)[4] + Concat(m, ctm)[1], Concat(m, ctm)[5] - Concat(m, ctm)[0]]);
+            vertices.push([Concat(advanceMatrix(m, f, g, v), ctm)[4] + Concat(advanceMatrix(m, f, g, v), ctm)[1], Concat(advanceMatrix(m, f, g, v), ctm)[5] - Concat(advanceMatrix(m, f, g, v), ctm)[0]]);
+            vertices.push([Concat(advanceMatrix(m, f, g, v), ctm)[4], Concat(advanceMatrix(m, f, g, v), ctm)[5]]);
+            Replacements[substitutionKey] = {"color": color, "vertices": vertices};
             replaced += String.fromCharCode(u);
             partSubstitutions[substitutionKey] = [u, g];
             anonymizedText.showGlyph(f, m, g, u, v);
