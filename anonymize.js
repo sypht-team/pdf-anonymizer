@@ -243,26 +243,24 @@ function anonymizePart(glyphs, ctm) {
                 u = Replacements[substitutionKey].unicode;
                 g = Replacements[substitutionKey].glyph;
                 color = [1, 1, 0];
+            } else if (glyphInWhitelist(glyphs[i], ctm)) {
+                u = glyphs[i].unicode;
+                g = glyphs[i].glyph;
+                color = [0, 0, 1];
+            } else if (WhitelistCharacters.indexOf(String.fromCharCode(glyphs[i].unicode)) >= 0) {
+                u = glyphs[i].unicode;
+                g = glyphs[i].glyph;
+                color = [0, 1, 0];
             } else {
-                if (glyphInWhitelist(glyphs[i], ctm)) {
-                    u = glyphs[i].unicode;
-                    g = glyphs[i].glyph;
-                    color = [0, 0, 1];
-                } else if (WhitelistCharacters.indexOf(String.fromCharCode(glyphs[i].unicode)) >= 0) {
-                    u = glyphs[i].unicode;
-                    g = glyphs[i].glyph;
-                    color = [0, 1, 0];
-                } else {
-                    while (!g) {
-                        u = anonymizeUnicode(glyphs[i].unicode);
-                        if (u == glyphs[i].unicode) {
-                            g = glyphs[i].glyph;
-                            color = [0, 1, 1];
-                            break;
-                        } else {
-                            g = CharacterMap[f.getName()][u];
-                            color = [0, 1, 0];
-                        }
+                while (!g) {
+                    u = anonymizeUnicode(glyphs[i].unicode);
+                    if (u == glyphs[i].unicode) {
+                        g = glyphs[i].glyph;
+                        color = [0, 1, 1];
+                        break;
+                    } else {
+                        g = CharacterMap[f.getName()][u];
+                        color = [0, 1, 0];
                     }
                 }
             }
