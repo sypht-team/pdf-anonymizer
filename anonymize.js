@@ -316,8 +316,7 @@ function glyphsToText(glyphs) {
     return text;
 }
 
-function splitText(text, ctm) {
-    var glyphs = textToGlyphs(text, ctm);
+function tokenize(glyphs) {
     var chunks = [];
     var chunk = [];
     for (var i = 0; i < glyphs.length; ++i) {
@@ -339,9 +338,8 @@ function splitText(text, ctm) {
 
 var Replacements = {};
 
-function generateText(glyphs) {
+function randomize(glyphs) {
     var replacements = [];
-    var string = "";
     for (var i = 0; i < glyphs.length; ++i) {
         var r;
         if (glyphs[i].key() in Replacements) {
@@ -354,13 +352,11 @@ function generateText(glyphs) {
             r = r.randomize(ZoneWhitelist, CharWhitelist, CharacterMap);
         }
         replacements.push(r);
-        string += r.string;
     }
-    var distance = replacements[replacements.length-1].nextMatrix.distance(glyphs[glyphs.length-1].nextMatrix);
-    return {"replacements": replacements, "distance": distance, "string": string};
+    return replacements;
 }
 
-function anonymizeChunk(glyphs) {
+function anonymize(glyphs) {
     var attempts = 0;
     var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix.m[0]);
     var original = "";
@@ -370,15 +366,20 @@ function anonymizeChunk(glyphs) {
     print("Replacing", original, "(tolerance:", tolerance + ")");
     while (true) {
         attempts++;
-        var generated = generateText(glyphs);
-        print(original, " -> ", generated.string, "(" + generated.distance + ")");
-        if (generated.distance <= tolerance) {
-            for (var i = 0; i < generated.replacements.length; ++i) {
-                Replacements[glyphs[i].key()] = generated.replacements[i];
+        var candidate = randomize(glyphs);
+        var candidateDistance = candidate[candidate.length-1].nextMatrix.distance(glyphs[glyphs.length-1].nextMatrix);
+        var candidateString = "";
+        for (var i = 0; i < candidate.length; ++i) {
+            candidateString += candidate[i].string;
+        }
+        print(original, " -> ", candidateString, "(" + candidateDistance + ")");
+        if (candidateDistance <= tolerance) {
+            for (var i = 0; i < candidate.length; ++i) {
+                Replacements[glyphs[i].key()] = candidate[i];
             }
             print("attempts:", attempts);
             print("\n");
-            return glyphsToText(generated.replacements);
+            return candidate;
         }
         if (attempts % (BackOffFrequency * glyphs.length) == 0) {
             tolerance *= BackOffAmount;
@@ -388,10 +389,11 @@ function anonymizeChunk(glyphs) {
 }
 
 function anonymizeText(text, ctm) {
+    var glyphs = textToGlyphs(text, ctm);
+    var chunks = tokenize(glyphs);
     var anonymizedText = new Text();
-    var chunks = splitText(text, ctm);
     for (var i = 0; i < chunks.length; ++i) {
-        anonymizeChunk(chunks[i]).walk(anonymizedText);
+        glyphsToText(anonymize(chunks[i])).walk(anonymizedText);
     }
     return anonymizedText;
 }
