@@ -56,13 +56,18 @@ var ZoneWhitelist = loadAnnotations(pixmap.getWidth(), pixmap.getHeight());
 function glyphInZoneWhitelist(glyph, ctm) {
     var currM = Concat(glyph.matrix, ctm);
     var nextM = Concat(glyph.nextMatrix, ctm);
-    var x = [currM[4], nextM[4], (currM[4] + nextM[4])/2];
-    var y = [currM[5], nextM[5], (currM[5] + nextM[5])/2];
+    var points = getVertices(currM, nextM, ctm);
+    var avgX = 0, avgY = 0;
+    for (var i = 0; i < points.length; ++i) {
+        avgX += points[i][0] / points.length;
+        avgY += points[i][1] / points.length;
+    }
+    points.push([avgX, avgY]);
     for (var i = 0; i < ZoneWhitelist.length; ++i) {
         var zone = ZoneWhitelist[i];
-        for (var j = 0; j < x.length; ++j) {
-            var x0 = x[j];
-            var y0 = y[j];
+        for (var j = 0; j < points.length; ++j) {
+            var x0 = points[j][0];
+            var y0 = points[j][1];
             if (x0 >= zone.x1 && x0 <= zone.x2 && y0 >= zone.y1 && y0 <= zone.y2) {
                 return true;
             }
@@ -193,11 +198,10 @@ function matricesDiffer(m1, m2) {
     return false;
 }
 
-function getVertices(m, ctm, font, glyph, wmode) {
-    var am = advanceMatrix(m, font, glyph, wmode);
-    var vertices = [];
+function getVertices(m, am, ctm) {
     m = Concat(m, ctm);
     am = Concat(am, ctm);
+    var vertices = [];
     vertices.push([m[4], m[5]]);
     vertices.push([m[4] + m[1], m[5] - m[0]]);
     vertices.push([am[4] + am[1], am[5] - am[0]]);
@@ -289,7 +293,7 @@ function generateText(glyphs, ctm) {
                 color = [0, 1, 0];
             }
         }
-        replacements[substitutionKey] = {"color": color, "vertices": getVertices(m, ctm, f, g, v), "unicode": u, "glyph": g};
+        replacements[substitutionKey] = {"color": color, "vertices": getVertices(m, advanceMatrix(m, f, g, v), ctm), "unicode": u, "glyph": g};
         string += String.fromCharCode(u);
         text.showGlyph(f, m, g, u, v);
         m = advanceMatrix(m, f, g, v);
