@@ -250,14 +250,6 @@ function splitText(text) {
     return chunks;
 }
 
-function mergeChunks(chunks) {
-    var text = new Text();
-    for (var i = 0; i < chunks.length; ++i) {
-        chunks[i].walk(text);
-    }
-    return text;
-}
-
 var Replacements = {};
 
 function generateText(glyphs, ctm) {
@@ -329,11 +321,12 @@ function anonymizeChunk(glyphs, ctm) {
 }
 
 function anonymizeText(text, ctm) {
-    var parts = splitText(text);
-    for (var i = 0; i < parts.length; ++i) {
-        parts[i] = anonymizeChunk(parts[i], ctm);
+    var anonymizedText = new Text();
+    var chunks = splitText(text);
+    for (var i = 0; i < chunks.length; ++i) {
+        anonymizeChunk(chunks[i], ctm).walk(anonymizedText);
     }
-    return mergeChunks(parts);
+    return anonymizedText;
 }
 
 // We cannot use inheritence to extend DrawDevice, since it is a native
