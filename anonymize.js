@@ -162,7 +162,6 @@ function splitText(text) {
                 "unicode": u,
                 "wmode": v
             });
-            print("char:", String.fromCharCode(u), "curr:", m, "next:", advanceMatrix(m, f, g, v));
         }
     });
     var chunks = [];
@@ -186,7 +185,6 @@ function splitText(text) {
         for (var j = 0; j < chunks[i].length; ++j) {
             characters += String.fromCharCode(chunks[i][j].unicode);
         }
-        print("chunk " + i + ": " + characters);
     }
     return chunks;
 }
@@ -254,11 +252,11 @@ var Replacements = {};
 function anonymizePart(glyphs, ctm) {
     var attempts = 0;
     var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix[0]);
-    print("font size:", glyphs[0].matrix[0], "tolerance:", tolerance);
     var original = "";
     for (var i = 0; i < glyphs.length; ++i) {
         original += String.fromCharCode(glyphs[i].unicode);
     }
+    print("Replacing", original, "(tolerance:", tolerance + ")");
     while (true) {
         attempts++;
         var anonymizedText = new Text();
@@ -298,26 +296,15 @@ function anonymizePart(glyphs, ctm) {
             anonymizedText.showGlyph(f, m, g, u, v);
             m = advanceMatrix(m, f, g, v);
         }
-        print(original, " -> ", replaced);
-        var delta;
-        if (v == 0) {
-            delta = m[4] - glyphs[glyphs.length-1].nextMatrix[4];
-        } else {
-            delta = m[5] - glyphs[glyphs.length-1].nextMatrix[5];
-        }
-        if (distance(m, glyphs[glyphs.length-1].nextMatrix) <= tolerance) {
-            print("close enough", delta);
+        var dist = distance(m, glyphs[glyphs.length-1].nextMatrix);
+        print(original, " -> ", replaced, "(" + dist + ")");
+        if (dist <= tolerance) {
             for (var k in tmpReplacements) {
                 Replacements[k] = tmpReplacements[k];
             }
             print("attempts:", attempts);
             print("\n");
             return anonymizedText;
-        }
-        if (delta > 0) {
-            print("too wide", delta);
-        } else {
-            print("too narrow", delta);
         }
         if (attempts % (BackOffFrequency * glyphs.length) == 0) {
             tolerance *= BackOffAmount;
