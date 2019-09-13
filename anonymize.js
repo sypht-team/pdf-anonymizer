@@ -249,6 +249,47 @@ function anonymizingPoolScore(fontName, unicode) {
 
 var Replacements = {};
 
+function generateText(glyphs, ctm) {
+    var text = new Text();
+    var f = glyphs[0].font;
+    var m = glyphs[0].matrix;
+    var v = glyphs[0].wmode;
+    var replacements = {};
+    var string = "";
+    for (var i = 0; i < glyphs.length; ++i) {
+        var u, g, color;
+        var substitutionKey = glyphs[i].font.getName() + "-" + Concat(glyphs[i].matrix, ctm) + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + glyphs[i].wmode;
+        if (substitutionKey in Replacements) {
+            u = Replacements[substitutionKey].unicode;
+            g = Replacements[substitutionKey].glyph;
+            color = [1, 1, 0];
+        } else if (glyphInWhitelist(glyphs[i], ctm)) {
+            u = glyphs[i].unicode;
+            g = glyphs[i].glyph;
+            color = [0, 0, 1];
+        } else if (WhitelistCharacters.indexOf(String.fromCharCode(glyphs[i].unicode)) >= 0) {
+            u = glyphs[i].unicode;
+            g = glyphs[i].glyph;
+            color = [0, 1, 0];
+        } else {
+            u = anonymizeUnicode(f.getName(), glyphs[i].unicode);
+            g = CharacterMap[f.getName()][u];
+            if (anonymizingPoolScore(f.getName(), u) < 0.25) {
+                color = [1, 0, 0];
+            } else if (u == glyphs[i].unicode) {
+                color = [0, 1, 1];
+            } else {
+                color = [0, 1, 0];
+            }
+        }
+        replacements[substitutionKey] = {"color": color, "vertices": getVertices(m, ctm, f, g, v), "unicode": u, "glyph": g};
+        string += String.fromCharCode(u);
+        text.showGlyph(f, m, g, u, v);
+        m = advanceMatrix(m, f, g, v);
+    }
+    return {"text": text, "string": string, "replacements": replacements, "distance": distance(m, glyphs[glyphs.length-1].nextMatrix)};
+}
+
 function anonymizePart(glyphs, ctm) {
     var attempts = 0;
     var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix[0]);
@@ -259,52 +300,15 @@ function anonymizePart(glyphs, ctm) {
     print("Replacing", original, "(tolerance:", tolerance + ")");
     while (true) {
         attempts++;
-        var anonymizedText = new Text();
-        var f = glyphs[0].font;
-        var m = glyphs[0].matrix;
-        var v = glyphs[0].wmode;
-        var tmpReplacements = {};
-        var replaced = "";
-        for (var i = 0; i < glyphs.length; ++i) {
-            var u, g, color;
-            var substitutionKey = glyphs[i].font.getName() + "-" + Concat(glyphs[i].matrix, ctm) + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + glyphs[i].wmode;
-            if (substitutionKey in Replacements) {
-                u = Replacements[substitutionKey].unicode;
-                g = Replacements[substitutionKey].glyph;
-                color = [1, 1, 0];
-            } else if (glyphInWhitelist(glyphs[i], ctm)) {
-                u = glyphs[i].unicode;
-                g = glyphs[i].glyph;
-                color = [0, 0, 1];
-            } else if (WhitelistCharacters.indexOf(String.fromCharCode(glyphs[i].unicode)) >= 0) {
-                u = glyphs[i].unicode;
-                g = glyphs[i].glyph;
-                color = [0, 1, 0];
-            } else {
-                u = anonymizeUnicode(f.getName(), glyphs[i].unicode);
-                g = CharacterMap[f.getName()][u];
-                if (anonymizingPoolScore(f.getName(), u) < 0.5) {
-                    color = [1, 0, 0];
-                } else if (u == glyphs[i].unicode) {
-                    color = [0, 1, 1];
-                } else {
-                    color = [0, 1, 0];
-                }
-            }
-            tmpReplacements[substitutionKey] = {"color": color, "vertices": getVertices(m, ctm, f, g, v), "unicode": u, "glyph": g};
-            replaced += String.fromCharCode(u);
-            anonymizedText.showGlyph(f, m, g, u, v);
-            m = advanceMatrix(m, f, g, v);
-        }
-        var dist = distance(m, glyphs[glyphs.length-1].nextMatrix);
-        print(original, " -> ", replaced, "(" + dist + ")");
-        if (dist <= tolerance) {
-            for (var k in tmpReplacements) {
-                Replacements[k] = tmpReplacements[k];
+        var generated = generateText(glyphs, ctm);
+        print(original, " -> ", generated.string, "(" + generated.distance + ")");
+        if (generated.distance <= tolerance) {
+            for (var k in generated.replacements) {
+                Replacements[k] = generated.replacements[k];
             }
             print("attempts:", attempts);
             print("\n");
-            return anonymizedText;
+            return generated.text;
         }
         if (attempts % (BackOffFrequency * glyphs.length) == 0) {
             tolerance *= BackOffAmount;
