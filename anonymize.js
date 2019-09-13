@@ -53,31 +53,7 @@ function loadAnnotations(width, height) {
 
 var ZoneWhitelist = loadAnnotations(pixmap.getWidth(), pixmap.getHeight());
 
-function glyphInZoneWhitelist(glyph, ctm) {
-    var points = glyph.matrix.vertices(glyph.nextMatrix, ctm);
-    var avgX = 0, avgY = 0;
-    for (var i = 0; i < points.length; ++i) {
-        avgX += points[i][0] / points.length;
-        avgY += points[i][1] / points.length;
-    }
-    points.push([avgX, avgY]);
-    for (var i = 0; i < ZoneWhitelist.length; ++i) {
-        var zone = ZoneWhitelist[i];
-        for (var j = 0; j < points.length; ++j) {
-            var x0 = points[j][0];
-            var y0 = points[j][1];
-            if (x0 >= zone.x1 && x0 <= zone.x2 && y0 >= zone.y1 && y0 <= zone.y2) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 var CharWhitelist = " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
-function glyphInCharWhitelist(glyph) {
-    return CharWhitelist.indexOf(String.fromCharCode(glyph.unicode)) >= 0;
-}
 
 // Font/character substitutions
 
@@ -220,30 +196,126 @@ function GlyphMatrix(m, maxGlyphDistance) {
 
 }
 
+function Glyph(f, m, g, u, v, ctm, color, alpha) {
+
+    // Font, Matrix, Glyph, Unicode, Vertical, Contextual Transform Matrix
+
+    this.font = f;
+    this.matrix = new GlyphMatrix(m);
+    this.nextMatrix = this.matrix.advance(f, g, v);
+    this.glyph = g;
+    this.unicode = u;
+    this.wmode = v;
+    this.ctm = ctm;
+
+    if (color === undefined) {
+        color = [1, 1, 1];
+    }
+    this.color = color;
+
+    if (alpha === undefined) {
+        alpha = 0;
+    }
+    this.alpha = alpha;
+
+    this.string = String.fromCharCode(u);
+
+    this.key = function() {
+        return this.font.getName() + "-" + this.matrix.transform(this.ctm).m + "-" + this.unicode + "-" + this.glyph + "-" + this.wmode;
+    }
+
+    this.placeAfter = function(glyph) {
+        return new Glyph(this.font, glyph.nextMatrix.m, this.glyph, this.unicode, this.wmode, this.ctm, this.color, this.alpha);
+    }
+
+    this.isWithin = function(zones) {
+        var points = this.matrix.vertices(this.nextMatrix, this.ctm);
+        var avgX = 0, avgY = 0;
+        for (var i = 0; i < points.length; ++i) {
+            avgX += points[i][0] / points.length;
+            avgY += points[i][1] / points.length;
+        }
+        points.push([avgX, avgY]);
+        for (var i = 0; i < zones.length; ++i) {
+            var zone = zones[i];
+            for (var j = 0; j < points.length; ++j) {
+                var x0 = points[j][0];
+                var y0 = points[j][1];
+                if (x0 >= zone.x1 && x0 <= zone.x2 && y0 >= zone.y1 && y0 <= zone.y2) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    this.isIn = function(characters) {
+        return characters.indexOf(this.string) >= 0;
+    }
+
+    this.randomize = function(zoneWhitelist, characterWhitelist, characterMap) {
+        var u, g, color, alpha;
+        if (this.isWithin(zoneWhitelist)) {
+            u = this.unicode;
+            g = this.glyph;
+            color = [0, 0, 1];
+            alpha = 0.3;
+        } else if (this.isIn(characterWhitelist)) {
+            u = this.unicode;
+            g = this.glyph;
+            color = [0, 1, 0];
+            alpha = 0.3;
+        } else {
+            u = anonymizeUnicode(this.font.getName(), this.unicode);
+            g = characterMap[this.font.getName()][u];
+            if (anonymizingPoolScore(this.font.getName(), u) < 0.25) {
+                color = [1, 0, 0];
+            } else if (u == this.unicode) {
+                color = [0, 1, 1];
+            } else {
+                color = [0, 1, 0];
+            }
+            alpha = 0.3;
+        }
+        return new Glyph(this.font, this.matrix.m, g, u, this.wmode, this.ctm, color, alpha);
+    }
+
+    this.succeeds = function(other) {
+        if (other.string == " ") {
+            return false;
+        }
+        if (this.font != other.font) {
+            return false;
+        }
+        if (this.wmode != other.wmode) {
+            return false;
+        }
+        return this.matrix.equals(other.nextMatrix);
+    }
+
+}
+
 // Text manipulation
 
-function splitText(text) {
+function textToGlyphs(text, ctm) {
     var glyphs = []
     text.walk({
         showGlyph: function (f, m, g, u, v) {
-            var matrix = new GlyphMatrix(m);
-            glyphs.push({
-                "font": f, 
-                "matrix": matrix,
-                "nextMatrix": matrix.advance(f, g, v),
-                "glyph": g,
-                "unicode": u,
-                "wmode": v
-            });
+            glyphs.push(new Glyph(f, m, g, u, v, ctm));
         }
     });
+    return glyphs;
+}
+
+function splitText(text, ctm) {
+    var glyphs = textToGlyphs(text, ctm);
     var chunks = [];
     var chunk = [];
     for (var i = 0; i < glyphs.length; ++i) {
         var curr = glyphs[i];
         if (chunk.length > 0) {
             var last = chunk[chunk.length-1];
-            if (String.fromCharCode(last.unicode) == " " || curr.font != last.font || curr.wmode != last.wmode || !curr.matrix.equals(last.nextMatrix)) {
+            if (!curr.succeeds(last)) {
                 chunks.push(chunk);
                 chunk = [];
             }
@@ -253,73 +325,49 @@ function splitText(text) {
     if (chunk.length > 0) {
         chunks.push(chunk);
     }
-    for (var i = 0; i < chunks.length; ++i) {
-        var characters = "";
-        for (var j = 0; j < chunks[i].length; ++j) {
-            characters += String.fromCharCode(chunks[i][j].unicode);
-        }
-    }
     return chunks;
 }
 
 var Replacements = {};
 
-function generateText(glyphs, ctm) {
+function generateText(glyphs) {
     var text = new Text();
-    var f = glyphs[0].font;
-    var matrix = glyphs[0].matrix;
-    var v = glyphs[0].wmode;
-    var replacements = {};
+    var replacements = [];
     var string = "";
     for (var i = 0; i < glyphs.length; ++i) {
-        var u, g, color;
-        var substitutionKey = glyphs[i].font.getName() + "-" + glyphs[i].matrix.transform(ctm).m + "-" + glyphs[i].unicode + "-" + glyphs[i].glyph + "-" + glyphs[i].wmode;
-        if (substitutionKey in Replacements) {
-            u = Replacements[substitutionKey].unicode;
-            g = Replacements[substitutionKey].glyph;
-            color = [1, 1, 0];
-        } else if (glyphInZoneWhitelist(glyphs[i], ctm)) {
-            u = glyphs[i].unicode;
-            g = glyphs[i].glyph;
-            color = [0, 0, 1];
-        } else if (glyphInCharWhitelist(glyphs[i])) {
-            u = glyphs[i].unicode;
-            g = glyphs[i].glyph;
-            color = [0, 1, 0];
+        var r;
+        if (glyphs[i].key() in Replacements) {
+            r = Replacements[glyphs[i].key()];
         } else {
-            u = anonymizeUnicode(f.getName(), glyphs[i].unicode);
-            g = CharacterMap[f.getName()][u];
-            if (anonymizingPoolScore(f.getName(), u) < 0.25) {
-                color = [1, 0, 0];
-            } else if (u == glyphs[i].unicode) {
-                color = [0, 1, 1];
+            if (i == 0) {
+                r = glyphs[i].randomize(ZoneWhitelist, CharWhitelist, CharacterMap);
             } else {
-                color = [0, 1, 0];
+                r = glyphs[i].placeAfter(replacements[i-1]).randomize(ZoneWhitelist, CharWhitelist, CharacterMap);
             }
         }
-        replacements[substitutionKey] = {"color": color, "vertices": matrix.vertices(matrix.advance(f, g, v), ctm), "unicode": u, "glyph": g};
-        string += String.fromCharCode(u);
-        text.showGlyph(f, matrix.m, g, u, v);
-        matrix = matrix.advance(f, g, v);
+        replacements.push(r);
+        text.showGlyph(r.font, r.matrix.m, r.glyph, r.unicode, r.wmode);
+        string += r.string;
     }
-    return {"text": text, "string": string, "replacements": replacements, "distance": matrix.distance(glyphs[glyphs.length-1].nextMatrix)};
+    var distance = replacements[replacements.length-1].nextMatrix.distance(glyphs[glyphs.length-1].nextMatrix);
+    return {"text": text, "replacements": replacements, "distance": distance, "string": string};
 }
 
-function anonymizeChunk(glyphs, ctm) {
+function anonymizeChunk(glyphs) {
     var attempts = 0;
     var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix.m[0]);
     var original = "";
     for (var i = 0; i < glyphs.length; ++i) {
-        original += String.fromCharCode(glyphs[i].unicode);
+        original += glyphs[i].string;
     }
     print("Replacing", original, "(tolerance:", tolerance + ")");
     while (true) {
         attempts++;
-        var generated = generateText(glyphs, ctm);
+        var generated = generateText(glyphs);
         print(original, " -> ", generated.string, "(" + generated.distance + ")");
         if (generated.distance <= tolerance) {
-            for (var k in generated.replacements) {
-                Replacements[k] = generated.replacements[k];
+            for (var i = 0; i < generated.replacements.length; ++i) {
+                Replacements[glyphs[i].key()] = generated.replacements[i];
             }
             print("attempts:", attempts);
             print("\n");
@@ -334,9 +382,9 @@ function anonymizeChunk(glyphs, ctm) {
 
 function anonymizeText(text, ctm) {
     var anonymizedText = new Text();
-    var chunks = splitText(text);
+    var chunks = splitText(text, ctm);
     for (var i = 0; i < chunks.length; ++i) {
-        anonymizeChunk(chunks[i], ctm).walk(anonymizedText);
+        anonymizeChunk(chunks[i]).walk(anonymizedText);
     }
     return anonymizedText;
 }
@@ -421,11 +469,12 @@ pixmap.saveAsPNG(scriptArgs[2]);
 
 for (var k in Replacements) {
     var r = Replacements[k];
+    var v = r.matrix.vertices(r.nextMatrix, r.ctm)
     var p = new Path();
-    p.moveTo(r.vertices[r.vertices.length-1][0], r.vertices[r.vertices.length-1][1])
-    for (var j = 0; j < r.vertices.length; ++j) {
-        var x = r.vertices[j][0];
-        var y = r.vertices[j][1];
+    p.moveTo(v[v.length-1][0], v[v.length-1][1])
+    for (var j = 0; j < v.length; ++j) {
+        var x = v[j][0];
+        var y = v[j][1];
         p.lineTo(x, y);
     }
     anonymizingDevice.fillPath(p, true, Identity, DeviceRGB, r.color, 0.3);
