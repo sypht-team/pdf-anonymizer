@@ -55,88 +55,95 @@ var ZoneWhitelist = loadAnnotations(pixmap.getWidth(), pixmap.getHeight());
 
 var CharWhitelist = " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
 
-// Font/character substitutions
-
-var CharacterMap = {};
-var analyzeCharacters = {
-    showGlyph: function (f, m, g, u, v, b) {
-        var fn = f.getName();
-        if (!(fn in CharacterMap)) {
-            CharacterMap[fn] = {};
-        }
-        CharacterMap[fn][u] = g;
-    }
-};
-page.run({
-    fillText: function(text, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
-    clipText: function(text, ctm) { text.walk(analyzeCharacters); },
-    strokeText: function(text, stroke, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
-    clipStrokeText: function(text, stroke, ctm) { text.walk(analyzeCharacters); },
-    ignoreText: function(text, ctm) { text.walk(analyzeCharacters); }
-}, Identity);
-
-
 var SubstitutionGroups = {
     lower: "abcdefghijklmnopqrstuvwxyzabcdefghiklmnopqrstuvwxyabcdefghiklmnopqrstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuyacdefghilmnoprstuyacdefghilmnoprstuyacdefghilmnoprstuyacdeghilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnorstuyacdehilmnorstuacdehilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuaceilnorstuaceilnorstuaceilnorstuaceilnorstuaceilnorstuaceilnorstuaceilnorstuaceilnorstaceilnorstaceilnorstaceilnorstaceilnorstaeilnorstaeilnorstaeilnorstaeilnorstaeilnorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaenotaenotaenotaenotaenotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeteteeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYABCDEFGHIJKLMNOPRSTUVWXYABCDEFGHILMNOPRSTUVWYABCDEFGHILMNOPRSTUVWYABCDEFGHILMNOPRSTUVWYABCDEFGHILMNOPRSTUWABCDEFGHILMNOPRSTUABCDEGILMNOPRSTUABCDEGILMNOPRSTUABCDEGILMNOPRSTUABCDEILMNOPRSTABCDEILMNOPRSTABCDEILNOPRSTACDEILNOPRSTACDEILNOPRSTACDEILNOPRSTACDEILNOPRSTACDEINOPRSTACDEINOPRSTACEINOPRSTACEINORSTACEINOSTAEINSTAEINSTAEINSTAESTAESTAESTAETAETATATATAT",
     digit: "012345678901200",
 };
 
-var FontSubstitutionGroups = {};
-for (var fontName in CharacterMap) {
-    FontSubstitutionGroups[fontName] = {};
-    for (var group in SubstitutionGroups) {
-        FontSubstitutionGroups[fontName][group] = "";
-        var characters = SubstitutionGroups[group];
-        for (var i = 0; i < characters.length; ++i) {
-            var chr = characters[i];
-            var uni = chr.charCodeAt(0);
-            if (uni in CharacterMap[fontName]) {
-                FontSubstitutionGroups[fontName][group] += chr;
+// Font/character substitutions
+
+function CharacterMap(page, substitutionGroups) {
+
+    var map = {};
+    var analyzeCharacters = {
+        showGlyph: function (f, m, g, u, v, b) {
+            var fn = f.getName();
+            if (!(fn in map)) {
+                map[fn] = {};
+            }
+            map[fn][u] = g;
+        }
+    };
+    page.run({
+        fillText: function(text, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
+        clipText: function(text, ctm) { text.walk(analyzeCharacters); },
+        strokeText: function(text, stroke, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
+        clipStrokeText: function(text, stroke, ctm) { text.walk(analyzeCharacters); },
+        ignoreText: function(text, ctm) { text.walk(analyzeCharacters); }
+    }, Identity);
+    this.map = map;
+
+    this.substitutionGroups = {};
+    for (var fontName in this.map) {
+        this.substitutionGroups[fontName] = {};
+        for (var group in substitutionGroups) {
+            this.substitutionGroups[fontName][group] = "";
+            var characters = substitutionGroups[group];
+            for (var i = 0; i < characters.length; ++i) {
+                var chr = characters[i];
+                var uni = chr.charCodeAt(0);
+                if (uni in this.map[fontName]) {
+                    this.substitutionGroups[fontName][group] += chr;
+                }
             }
         }
     }
-}
 
-function unique(characters) {
-    var uniqueCharacters = "";
-    for (var i = 0; i < characters.length; ++i) {
-        if (uniqueCharacters.indexOf(characters[i]) < 0) {
-            uniqueCharacters += characters[i];
+    this.substitutionGroupScores = {};
+    var unique = function(characters) {
+        var uniqueCharacters = "";
+        for (var i = 0; i < characters.length; ++i) {
+            if (uniqueCharacters.indexOf(characters[i]) < 0) {
+                uniqueCharacters += characters[i];
+            }
+        }
+        return uniqueCharacters;
+    };
+    for (var fontName in this.map) {
+        this.substitutionGroupScores[fontName] = {}
+        for (var group in this.substitutionGroups[fontName]) {
+            var fontCharacters = unique(this.substitutionGroups[fontName][group]);
+            var characters = unique(substitutionGroups[group]);
+            this.substitutionGroupScores[fontName][group] = fontCharacters.length / characters.length;
         }
     }
-    return uniqueCharacters;
-}
 
-var FontSubstitutionGroupScores = {};
-for (var fontName in CharacterMap) {
-    FontSubstitutionGroupScores[fontName] = {}
-    for (var group in FontSubstitutionGroups[fontName]) {
-        var fontCharacters = unique(FontSubstitutionGroups[fontName][group]);
-        var characters = unique(SubstitutionGroups[group]);
-        FontSubstitutionGroupScores[fontName][group] = fontCharacters.length / characters.length;
-    }
-}
-
-function anonymizingPoolScore(fontName, unicode) {
-    for (var group in FontSubstitutionGroups[fontName]) {
-        var characters = FontSubstitutionGroups[fontName][group];
-        if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {
-            return FontSubstitutionGroupScores[fontName][group];
+    this.anonymizingPoolScore = function(fontName, unicode) {
+        for (var group in this.substitutionGroups[fontName]) {
+            var characters = this.substitutionGroups[fontName][group];
+            if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {
+                return this.substitutionGroupScores[fontName][group];
+            }
         }
+        return 0;
     }
-    return 0;
+
+    this.anonymize = function(fontName, unicode) {
+        for (var group in this.substitutionGroups[fontName]) {
+            var characters = this.substitutionGroups[fontName][group];
+            if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {
+                unicode = characters[parseInt(Math.random()*characters.length)].charCodeAt(0);
+                break;
+            }
+        }
+        var glyph = this.map[fontName][unicode];
+        var score = this.anonymizingPoolScore(fontName, unicode);
+        return {unicode: unicode, glyph: glyph, score: score};
+    }
 }
 
-function anonymizeUnicode(fontName, unicode) {
-    for (var group in FontSubstitutionGroups[fontName]) {
-        var characters = FontSubstitutionGroups[fontName][group];
-        if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {
-            return characters[parseInt(Math.random()*characters.length)].charCodeAt(0);
-        }
-    }
-    return unicode;
-}
+var characterMap = new CharacterMap(page, SubstitutionGroups);
 
 // Matrices/geometry
 
@@ -266,9 +273,10 @@ function Glyph(f, m, g, u, v, ctm, color, alpha) {
             color = [0, 1, 0];
             alpha = 0.3;
         } else {
-            u = anonymizeUnicode(this.font.getName(), this.unicode);
-            g = characterMap[this.font.getName()][u];
-            if (anonymizingPoolScore(this.font.getName(), u) < 0.25) {
+            var result = characterMap.anonymize(this.font.getName(), this.unicode);
+            u = result.unicode;
+            g = result.glyph;
+            if (result.score < 0.25) {
                 color = [1, 0, 0];
             } else if (u == this.unicode) {
                 color = [0, 1, 1];
@@ -349,7 +357,7 @@ function randomize(glyphs) {
             if (i > 0) {
                 r = r.placeAfter(replacements[i-1]);
             }
-            r = r.randomize(ZoneWhitelist, CharWhitelist, CharacterMap);
+            r = r.randomize(ZoneWhitelist, CharWhitelist, characterMap);
         }
         replacements.push(r);
     }
