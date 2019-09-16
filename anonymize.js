@@ -201,6 +201,14 @@ function Glyph(f, m, g, u, v, ctm, color, alpha) {
 
     this.string = String.fromCharCode(u);
 
+    var t = this.matrix.transform(this.ctm);
+    var a = this.nextMatrix.transform(this.ctm);
+    this.vertices = [];
+    this.vertices.push([t.m[4], t.m[5]]);
+    this.vertices.push([t.m[4] + t.m[1], t.m[5] - t.m[0]]);
+    this.vertices.push([a.m[4] + a.m[1], a.m[5] - a.m[0]]);
+    this.vertices.push([a.m[4], a.m[5]]);
+
     this.toString = function() {
         return "Glyph(" + [this.font.getName(), this.matrix.transform(this.ctm).toString(), this.unicode, this.glyph, this.wmode].join(", ") + ")";
     }
@@ -209,19 +217,8 @@ function Glyph(f, m, g, u, v, ctm, color, alpha) {
         return new Glyph(this.font, glyph.nextMatrix.m, this.glyph, this.unicode, this.wmode, this.ctm, this.color, this.alpha);
     }
 
-    this.vertices = function() {
-        var t = this.matrix.transform(this.ctm);
-        var a = this.nextMatrix.transform(this.ctm);
-        var vertices = [];
-        vertices.push([t.m[4], t.m[5]]);
-        vertices.push([t.m[4] + t.m[1], t.m[5] - t.m[0]]);
-        vertices.push([a.m[4] + a.m[1], a.m[5] - a.m[0]]);
-        vertices.push([a.m[4], a.m[5]]);
-        return vertices;
-    }
-
     this.isWithin = function(zones) {
-        var points = this.vertices();
+        var points = this.vertices;
         var avgX = 0, avgY = 0;
         for (var i = 0; i < points.length; ++i) {
             avgX += points[i][0] / points.length;
@@ -471,7 +468,7 @@ pixmap.saveAsPNG(scriptArgs[2]);
 
 for (var k in Replacements) {
     var r = Replacements[k];
-    var v = r.vertices();
+    var v = r.vertices;
     var p = new Path();
     p.moveTo(v[v.length-1][0], v[v.length-1][1])
     for (var j = 0; j < v.length; ++j) {
