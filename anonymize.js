@@ -66,81 +66,62 @@ var SubstitutionGroups = {
 function CharacterMap(page, substitutionGroups) {
 
     var map = {};
-    var analyzeCharacters = {
-        showGlyph: function (f, m, g, u, v, b) {
+    var characterAnalyzer = {
+        showGlyph: function(f, m, g, u) {
             var fn = f.getName();
             if (!(fn in map)) {
                 map[fn] = {};
             }
             map[fn][u] = g;
-        }
-    };
-    page.run({
-        fillText: function(text, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
-        clipText: function(text, ctm) { text.walk(analyzeCharacters); },
-        strokeText: function(text, stroke, ctm, colorSpace, color, alpha) { text.walk(analyzeCharacters); },
-        clipStrokeText: function(text, stroke, ctm) { text.walk(analyzeCharacters); },
-        ignoreText: function(text, ctm) { text.walk(analyzeCharacters); }
-    }, Identity);
-    this.map = map;
+        },
+        fillText: function(text) { text.walk(this); },
+        clipText: function(text) { text.walk(this); },
+        strokeText: function(text) { text.walk(this); },
+        clipStrokeText: function(text) { text.walk(this); },
+        ignoreText: function(text) { text.walk(this); }
+    }
+    page.run(characterAnalyzer, Identity);
 
-    this.substitutionGroups = {};
-    for (var fontName in this.map) {
-        this.substitutionGroups[fontName] = {};
+    var countUnique = function(characters) {
+        var unique = {};
+        for (var i = 0; i < characters.length; ++i) {
+            unique[characters[i]] = true;
+        }
+        return Object.keys(unique).length;
+    };
+
+    var fontSubstitutionGroups = {};
+    var fontSubstitutionGroupScores = {};
+    for (var fontName in map) {
+        fontSubstitutionGroups[fontName] = {};
+        fontSubstitutionGroupScores[fontName] = {};
         for (var group in substitutionGroups) {
-            this.substitutionGroups[fontName][group] = "";
+            fontSubstitutionGroups[fontName][group] = "";
             var characters = substitutionGroups[group];
             for (var i = 0; i < characters.length; ++i) {
                 var chr = characters[i];
                 var uni = chr.charCodeAt(0);
-                if (uni in this.map[fontName]) {
-                    this.substitutionGroups[fontName][group] += chr;
+                if (uni in map[fontName]) {
+                    fontSubstitutionGroups[fontName][group] += chr;
                 }
             }
+            fontSubstitutionGroupScores[fontName][group] = countUnique(fontSubstitutionGroups[fontName][group]) / countUnique(substitutionGroups[group]);
         }
-    }
-
-    this.substitutionGroupScores = {};
-    var unique = function(characters) {
-        var uniqueCharacters = "";
-        for (var i = 0; i < characters.length; ++i) {
-            if (uniqueCharacters.indexOf(characters[i]) < 0) {
-                uniqueCharacters += characters[i];
-            }
-        }
-        return uniqueCharacters;
-    };
-    for (var fontName in this.map) {
-        this.substitutionGroupScores[fontName] = {}
-        for (var group in this.substitutionGroups[fontName]) {
-            var fontCharacters = unique(this.substitutionGroups[fontName][group]);
-            var characters = unique(substitutionGroups[group]);
-            this.substitutionGroupScores[fontName][group] = fontCharacters.length / characters.length;
-        }
-    }
-
-    this.anonymizingPoolScore = function(fontName, unicode) {
-        for (var group in this.substitutionGroups[fontName]) {
-            var characters = this.substitutionGroups[fontName][group];
-            if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {
-                return this.substitutionGroupScores[fontName][group];
-            }
-        }
-        return 0;
     }
 
     this.anonymize = function(fontName, unicode) {
-        for (var group in this.substitutionGroups[fontName]) {
-            var characters = this.substitutionGroups[fontName][group];
+        var score = 0;
+        for (var group in fontSubstitutionGroups[fontName]) {
+            var characters = fontSubstitutionGroups[fontName][group];
             if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {
                 unicode = characters[parseInt(Math.random()*characters.length)].charCodeAt(0);
+                score = fontSubstitutionGroupScores[fontName][group];
                 break;
             }
         }
-        var glyph = this.map[fontName][unicode];
-        var score = this.anonymizingPoolScore(fontName, unicode);
+        var glyph = map[fontName][unicode];
         return {unicode: unicode, glyph: glyph, score: score};
-    }
+    };
 }
 
 var characterMap = new CharacterMap(page, SubstitutionGroups);
