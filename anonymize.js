@@ -177,7 +177,7 @@ function GlyphMatrix(m, maxGlyphDistance) {
 
 }
 
-function Glyph(f, m, g, u, v, ctm, color, alpha) {
+function Glyph(f, m, g, u, v, ctm, color) {
 
     // Font, Matrix, Glyph, Unicode, Vertical, Contextual Transform Matrix
 
@@ -190,14 +190,9 @@ function Glyph(f, m, g, u, v, ctm, color, alpha) {
     this.ctm = ctm;
 
     if (color === undefined) {
-        color = [1, 1, 1];
+        color = [0, 0, 0];
     }
     this.color = color;
-
-    if (alpha === undefined) {
-        alpha = 0;
-    }
-    this.alpha = alpha;
 
     this.string = String.fromCharCode(u);
 
@@ -214,7 +209,7 @@ function Glyph(f, m, g, u, v, ctm, color, alpha) {
     }
 
     this.placeAfter = function(glyph) {
-        return new Glyph(this.font, glyph.nextMatrix.m, this.glyph, this.unicode, this.wmode, this.ctm, this.color, this.alpha);
+        return new Glyph(this.font, glyph.nextMatrix.m, this.glyph, this.unicode, this.wmode, this.ctm, this.color);
     }
 
     this.isWithin = function(zones) {
@@ -243,17 +238,15 @@ function Glyph(f, m, g, u, v, ctm, color, alpha) {
     }
 
     this.randomize = function(zoneWhitelist, characterWhitelist, characterMap) {
-        var u, g, color, alpha;
+        var u, g, color;
         if (this.isWithin(zoneWhitelist)) {
             u = this.unicode;
             g = this.glyph;
             color = [0, 0, 1];
-            alpha = 0.3;
         } else if (this.isIn(characterWhitelist)) {
             u = this.unicode;
             g = this.glyph;
             color = [0, 1, 0];
-            alpha = 0.3;
         } else {
             var result = characterMap.anonymize(this.font.getName(), this.unicode);
             u = result.unicode;
@@ -265,9 +258,8 @@ function Glyph(f, m, g, u, v, ctm, color, alpha) {
             } else {
                 color = [0, 1, 0];
             }
-            alpha = 0.3;
         }
-        return new Glyph(this.font, this.matrix.m, g, u, this.wmode, this.ctm, color, alpha);
+        return new Glyph(this.font, this.matrix.m, g, u, this.wmode, this.ctm, color);
     }
 
     this.succeeds = function(other) {
