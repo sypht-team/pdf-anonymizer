@@ -136,7 +136,11 @@ function GlyphMatrix(m, maxGlyphDistance) {
     if (maxGlyphDistance === undefined) {
         maxGlyphDistance = MaxGlyphDistance;
     }
-    this.maxGlyphDistance = maxGlyphDistance;
+    this.maxGlyphDistance = maxGlyphDistance * Math.abs(m[0]);
+
+    this.toString = function() {
+        return "GlyphMatrix(" + this.m.join(",") + ")";
+    }
 
     this.advance = function(font, glyph, wmode) {
         var adv = font.advanceGlyph(glyph, wmode);
@@ -164,7 +168,7 @@ function GlyphMatrix(m, maxGlyphDistance) {
                 return false;
             }
         }
-        return this.distance(other) <= this.maxGlyphDistance * Math.abs(this.m[0])
+        return this.distance(other) <= this.maxGlyphDistance;
     }
 
     this.transform = function(ctm) {
@@ -197,8 +201,8 @@ function Glyph(f, m, g, u, v, ctm, color, alpha) {
 
     this.string = String.fromCharCode(u);
 
-    this.key = function() {
-        return this.font.getName() + "-" + this.matrix.transform(this.ctm).m + "-" + this.unicode + "-" + this.glyph + "-" + this.wmode;
+    this.toString = function() {
+        return "Glyph(" + [this.font.getName(), this.matrix.transform(this.ctm).toString(), this.unicode, this.glyph, this.wmode].join(", ") + ")";
     }
 
     this.placeAfter = function(glyph) {
@@ -331,8 +335,8 @@ function randomize(glyphs) {
     var replacements = [];
     for (var i = 0; i < glyphs.length; ++i) {
         var r;
-        if (glyphs[i].key() in Replacements) {
-            r = Replacements[glyphs[i].key()];
+        if (glyphs[i] in Replacements) {
+            r = Replacements[glyphs[i]];
         } else {
             r = glyphs[i];
             if (i > 0) {
@@ -364,7 +368,7 @@ function anonymize(glyphs) {
         print(original, " -> ", candidateString, "(" + candidateDistance + ")");
         if (candidateDistance <= tolerance) {
             for (var i = 0; i < candidate.length; ++i) {
-                Replacements[glyphs[i].key()] = candidate[i];
+                Replacements[glyphs[i]] = candidate[i];
             }
             print("attempts:", attempts);
             print("\n");
