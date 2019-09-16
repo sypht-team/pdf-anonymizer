@@ -21,47 +21,13 @@ var BackOffAmount = 1.5;
 // This parameter should rarely require tuning.
 var MaxGlyphDistance = 0.1;
 
-if (scriptArgs.length != 3) {
-    print("usage: mutool run anonymize.js document.pdf pageNumber output.png")
-    quit(1);
-}
-
-var scaleMatrix = Scale(Resolution/72, Resolution/72);
-
-var doc = new Document(scriptArgs[0]);
-var page = doc.loadPage(parseInt(scriptArgs[1])-1);
-var pixmap = page.toPixmap(scaleMatrix, DeviceRGB);
-pixmap.clear(255);
-
-// Whitelists
-
-function loadAnnotations(width, height) {
-    try {
-        var annotations = read(scriptArgs[0].replace(".pdf", ".json"));
-    } catch (err) {
-        return [];
-    }
-    annotations = JSON.parse(annotations);
-    for (var i = 0; i < annotations.length; ++i) {
-        annotations[i].x1 *= width;
-        annotations[i].y1 *= height;
-        annotations[i].x2 *= width;
-        annotations[i].y2 *= height;
-    }
-    return annotations;
-}
-
-var ZoneWhitelist = loadAnnotations(pixmap.getWidth(), pixmap.getHeight());
-
-var CharWhitelist = " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+var CharacterWhitelist = " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
 
 var SubstitutionGroups = {
     lower: "abcdefghijklmnopqrstuvwxyzabcdefghiklmnopqrstuvwxyabcdefghiklmnopqrstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwxyabcdefghiklmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuvwyabcdefghilmnoprstuyacdefghilmnoprstuyacdefghilmnoprstuyacdefghilmnoprstuyacdeghilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnoprstuyacdehilmnorstuyacdehilmnorstuacdehilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilmnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuacdeilnorstuaceilnorstuaceilnorstuaceilnorstuaceilnorstuaceilnorstuaceilnorstuaceilnorstuaceilnorstaceilnorstaceilnorstaceilnorstaceilnorstaeilnorstaeilnorstaeilnorstaeilnorstaeilnorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinorstaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaeinortaenotaenotaenotaenotaenotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeotaeteteeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYABCDEFGHIJKLMNOPRSTUVWXYABCDEFGHILMNOPRSTUVWYABCDEFGHILMNOPRSTUVWYABCDEFGHILMNOPRSTUVWYABCDEFGHILMNOPRSTUWABCDEFGHILMNOPRSTUABCDEGILMNOPRSTUABCDEGILMNOPRSTUABCDEGILMNOPRSTUABCDEILMNOPRSTABCDEILMNOPRSTABCDEILNOPRSTACDEILNOPRSTACDEILNOPRSTACDEILNOPRSTACDEILNOPRSTACDEINOPRSTACDEINOPRSTACEINOPRSTACEINORSTACEINOSTAEINSTAEINSTAEINSTAESTAESTAESTAETAETATATATAT",
     digit: "012345678901200",
 };
-
-// Font/character substitutions
 
 function CharacterMap(page, substitutionGroups) {
 
@@ -124,19 +90,12 @@ function CharacterMap(page, substitutionGroups) {
     };
 }
 
-var characterMap = new CharacterMap(page, SubstitutionGroups);
-
-// Matrices/geometry
-
-function GlyphMatrix(m, maxGlyphDistance) {
+function GlyphMatrix(m) {
 
     // Transform with 6 elements.
     this.m = m;
 
-    if (maxGlyphDistance === undefined) {
-        maxGlyphDistance = MaxGlyphDistance;
-    }
-    this.maxGlyphDistance = maxGlyphDistance * Math.abs(m[0]);
+    this.maxGlyphDistance = MaxGlyphDistance * Math.abs(m[0]);
 
     this.toString = function() {
         return "GlyphMatrix(" + this.m.join(",") + ")";
@@ -233,17 +192,13 @@ function Glyph(f, m, g, u, v, ctm, color) {
         return false;
     }
 
-    this.isIn = function(characters) {
-        return characters.indexOf(this.string) >= 0;
-    }
-
-    this.randomize = function(zoneWhitelist, characterWhitelist, characterMap) {
+    this.randomize = function(characterMap, characterWhitelist, zoneWhitelist) {
         var u, g, color;
         if (this.isWithin(zoneWhitelist)) {
             u = this.unicode;
             g = this.glyph;
             color = [0, 0, 1];
-        } else if (this.isIn(characterWhitelist)) {
+        } else if (characterWhitelist.indexOf(this.string) >= 0) {
             u = this.unicode;
             g = this.glyph;
             color = [0, 1, 0];
@@ -277,132 +232,131 @@ function Glyph(f, m, g, u, v, ctm, color) {
 
 }
 
-// Text manipulation
+function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhitelist) {
 
-function textToGlyphs(text, ctm) {
-    var glyphs = []
-    text.walk({
-        showGlyph: function (f, m, g, u, v) {
-            glyphs.push(new Glyph(f, m, g, u, v, ctm));
+    this.dd = DrawDevice(Identity, pixmap);
+    this.characterMap = characterMap;
+    this.characterWhitelist = characterWhitelist;
+    this.zoneWhitelist = zoneWhitelist;
+    this.replacements = {};
+
+    this.anonymizeText = function (text, ctm) {
+        var glyphs = this.textToGlyphs(text, ctm);
+        var chunks = this.tokenize(glyphs);
+        var anonymizedText = new Text();
+        for (var i = 0; i < chunks.length; ++i) {
+            this.glyphsToText(this.anonymize(chunks[i])).walk(anonymizedText);
         }
-    });
-    return glyphs;
-}
+        return anonymizedText;
+    };
 
-function glyphsToText(glyphs) {
-    var text = new Text();
-    for (var i = 0; i < glyphs.length; ++i) {
-        var g = glyphs[i];
-        text.showGlyph(g.font, g.matrix.m, g.glyph, g.unicode, g.wmode);
-    }
-    return text;
-}
+    this.textToGlyphs = function(text, ctm) {
+        var glyphs = []
+        text.walk({
+            showGlyph: function (f, m, g, u, v) {
+                glyphs.push(new Glyph(f, m, g, u, v, ctm));
+            }
+        });
+        return glyphs;
+    };
 
-function tokenize(glyphs) {
-    var chunks = [];
-    var chunk = [];
-    for (var i = 0; i < glyphs.length; ++i) {
-        var curr = glyphs[i];
+    this.glyphsToText = function(glyphs) {
+        var text = new Text();
+        for (var i = 0; i < glyphs.length; ++i) {
+            var g = glyphs[i];
+            text.showGlyph(g.font, g.matrix.m, g.glyph, g.unicode, g.wmode);
+        }
+        return text;
+    };
+
+    this.tokenize = function(glyphs) {
+        var chunks = [];
+        var chunk = [];
+        for (var i = 0; i < glyphs.length; ++i) {
+            var curr = glyphs[i];
+            if (chunk.length > 0) {
+                var last = chunk[chunk.length-1];
+                if (!curr.succeeds(last)) {
+                    chunks.push(chunk);
+                    chunk = [];
+                }
+            }
+            chunk.push(curr);
+        }
         if (chunk.length > 0) {
-            var last = chunk[chunk.length-1];
-            if (!curr.succeeds(last)) {
-                chunks.push(chunk);
-                chunk = [];
-            }
+            chunks.push(chunk);
         }
-        chunk.push(curr);
-    }
-    if (chunk.length > 0) {
-        chunks.push(chunk);
-    }
-    return chunks;
-}
+        return chunks;
+    };
 
-var Replacements = {};
-
-function randomize(glyphs) {
-    var replacements = [];
-    for (var i = 0; i < glyphs.length; ++i) {
-        var r;
-        if (glyphs[i] in Replacements) {
-            r = Replacements[glyphs[i]];
-        } else {
-            r = glyphs[i];
-            if (i > 0) {
-                r = r.placeAfter(replacements[i-1]);
-            }
-            r = r.randomize(ZoneWhitelist, CharWhitelist, characterMap);
+    this.anonymize = function(glyphs) {
+        var attempts = 0;
+        var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix.m[0]);
+        var original = "";
+        for (var i = 0; i < glyphs.length; ++i) {
+            original += glyphs[i].string;
         }
-        replacements.push(r);
-    }
-    return replacements;
-}
-
-function anonymize(glyphs) {
-    var attempts = 0;
-    var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix.m[0]);
-    var original = "";
-    for (var i = 0; i < glyphs.length; ++i) {
-        original += glyphs[i].string;
-    }
-    print("Replacing", original, "(tolerance:", tolerance + ")");
-    while (true) {
-        attempts++;
-        var candidate = randomize(glyphs);
-        var candidateDistance = candidate[candidate.length-1].nextMatrix.distance(glyphs[glyphs.length-1].nextMatrix);
-        var candidateString = "";
-        for (var i = 0; i < candidate.length; ++i) {
-            candidateString += candidate[i].string;
-        }
-        print(original, " -> ", candidateString, "(" + candidateDistance + ")");
-        if (candidateDistance <= tolerance) {
+        print("Replacing", original, "(tolerance:", tolerance + ")");
+        while (true) {
+            attempts++;
+            var candidate = this.randomize(glyphs);
+            var candidateDistance = candidate[candidate.length-1].nextMatrix.distance(glyphs[glyphs.length-1].nextMatrix);
+            var candidateString = "";
             for (var i = 0; i < candidate.length; ++i) {
-                Replacements[glyphs[i]] = candidate[i];
+                candidateString += candidate[i].string;
             }
-            print("attempts:", attempts);
-            print("\n");
-            return candidate;
+            print(original, " -> ", candidateString, "(" + candidateDistance + ")");
+            if (candidateDistance <= tolerance) {
+                for (var i = 0; i < candidate.length; ++i) {
+                    this.replacements[glyphs[i]] = candidate[i];
+                }
+                print("attempts:", attempts);
+                print("\n");
+                return candidate;
+            }
+            if (attempts % (BackOffFrequency * glyphs.length) == 0) {
+                tolerance *= BackOffAmount;
+                print("increasing tolerance to", tolerance);
+            }
         }
-        if (attempts % (BackOffFrequency * glyphs.length) == 0) {
-            tolerance *= BackOffAmount;
-            print("increasing tolerance to", tolerance);
+    };
+
+    this.randomize = function(glyphs) {
+        var replacements = [];
+        for (var i = 0; i < glyphs.length; ++i) {
+            var r;
+            if (glyphs[i] in this.replacements) {
+                r = this.replacements[glyphs[i]];
+            } else {
+                r = glyphs[i];
+                if (i > 0) {
+                    r = r.placeAfter(replacements[i-1]);
+                }
+                r = r.randomize(this.characterMap, this.characterWhitelist, this.zoneWhitelist);
+            }
+            replacements.push(r);
         }
-    }
-}
+        return replacements;
+    };
 
-function anonymizeText(text, ctm) {
-    var glyphs = textToGlyphs(text, ctm);
-    var chunks = tokenize(glyphs);
-    var anonymizedText = new Text();
-    for (var i = 0; i < chunks.length; ++i) {
-        glyphsToText(anonymize(chunks[i])).walk(anonymizedText);
-    }
-    return anonymizedText;
-}
-
-// We cannot use inheritence to extend DrawDevice, since it is a native
-// class. Instead, we use composition to override the text functions.
-
-function AnonymizingDrawDevice(transform, pixmap) {
-    this.dd = DrawDevice(transform, pixmap);
     this.fillText = function(text, ctm, colorSpace, color, alpha) {
-        text = anonymizeText(text, ctm);
+        text = this.anonymizeText(text, ctm);
         return this.dd.fillText(text, ctm, colorSpace, color, alpha);
     };
     this.clipText = function(text, ctm) {
-        text = anonymizeText(text, ctm);
+        text = this.anonymizeText(text, ctm);
         return this.dd.clipText(text, ctm);
     };
     this.strokeText = function(text, stroke, ctm, colorSpace, color, alpha) {
-        text = anonymizeText(text, ctm);
+        text = this.anonymizeText(text, ctm);
         return this.dd.strokeText(text, stroke, ctm, colorSpace, color, alpha);
     };
     this.clipStrokeText = function(text, stroke, ctm) {
-        text = anonymizeText(text, ctm);
+        text = this.anonymizeText(text, ctm);
         return this.dd.clipStrokeText(text, stroke, ctm);
     };
     this.ignoreText = function(text, ctm) {
-        text = anonymizeText(text, ctm);
+        text = this.anonymizeText(text, ctm);
         return this.dd.ignoreText(text, ctm);
     };
     this.fillPath = function(path, evenOdd, ctm, colorSpace, color, alpha) {
@@ -454,22 +408,70 @@ function AnonymizingDrawDevice(transform, pixmap) {
         return this.dd.close();
     };
 }
-var anonymizingDevice = new AnonymizingDrawDevice(Identity, pixmap);
-page.run(anonymizingDevice, scaleMatrix);
-pixmap.saveAsPNG(scriptArgs[2]);
 
-for (var k in Replacements) {
-    var r = Replacements[k];
-    var v = r.vertices;
-    var p = new Path();
-    p.moveTo(v[v.length-1][0], v[v.length-1][1])
-    for (var j = 0; j < v.length; ++j) {
-        var x = v[j][0];
-        var y = v[j][1];
-        p.lineTo(x, y);
-    }
-    anonymizingDevice.fillPath(p, true, Identity, DeviceRGB, r.color, 0.3);
+function PdfAnonymizer(fileName, pageIndex, substitutionGroups, characterWhitelist, annotationsFile) {
+
+    var doc = new Document(fileName);
+    this.page = doc.loadPage(pageIndex);
+
+    this.characterMap = new CharacterMap(this.page, substitutionGroups);
+    this.characterWhitelist = characterWhitelist;
+    this.annotationsFile = annotationsFile;
+
+    this.loadAnnotations = function(outputWidth, outputHeight) {
+        try {
+            var annotations = read(this.annotationsFile);
+        } catch (err) {
+            return [];
+        }
+        annotations = JSON.parse(annotations);
+        for (var i = 0; i < annotations.length; ++i) {
+            annotations[i].x1 *= outputWidth;
+            annotations[i].y1 *= outputHeight;
+            annotations[i].x2 *= outputWidth;
+            annotations[i].y2 *= outputHeight;
+        }
+        return annotations;
+    };
+
+    this.run = function(outputResolution, outputFile, highlightedOutputFile) {
+
+        var scaleMatrix = Scale(outputResolution/72, outputResolution/72);
+        var pixmap = this.page.toPixmap(scaleMatrix, DeviceRGB);
+        pixmap.clear(255);
+
+        var zoneWhitelist = this.loadAnnotations(pixmap.getWidth(), pixmap.getHeight());
+
+        var anonymizingDevice = new AnonymizingDevice(pixmap, this.characterMap, this.characterWhitelist, zoneWhitelist);
+        this.page.run(anonymizingDevice, scaleMatrix);
+        pixmap.saveAsPNG(outputFile);
+
+        if (highlightedOutputFile === undefined) {
+            return;
+        }
+
+        for (var k in anonymizingDevice.replacements) {
+            var r = anonymizingDevice.replacements[k];
+            var v = r.vertices;
+            var p = new Path();
+            p.moveTo(v[v.length-1][0], v[v.length-1][1])
+            for (var j = 0; j < v.length; ++j) {
+                var x = v[j][0];
+                var y = v[j][1];
+                p.lineTo(x, y);
+            }
+            anonymizingDevice.fillPath(p, true, Identity, DeviceRGB, r.color, 0.3);
+        }
+        pixmap.saveAsPNG(highlightedOutputFile);
+
+        anonymizingDevice.close();
+    };
 }
 
-pixmap.saveAsPNG(scriptArgs[2].replace(".png", ".info.png"));
-anonymizingDevice.close()
+if (scriptArgs.length != 3) {
+    print("usage: mutool run anonymize.js document.pdf pageNumber output.png")
+    quit(1);
+}
+
+var anonymizer = new PdfAnonymizer(scriptArgs[0], parseInt(scriptArgs[1])-1, SubstitutionGroups, CharacterWhitelist, scriptArgs[0].replace(".pdf", ".json"));
+anonymizer.run(Resolution, scriptArgs[2], scriptArgs[2].replace(".png", ".info.png"));
