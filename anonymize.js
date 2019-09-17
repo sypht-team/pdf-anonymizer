@@ -95,7 +95,9 @@ function GlyphMatrix(m) {
     // Transform with 6 elements.
     this.m = m;
 
-    this.maxGlyphDistance = MaxGlyphDistance * Math.abs(m[0]);
+    this.size = Math.max(Math.sqrt(m[0]*m[0] + m[1]*m[1]), Math.sqrt(m[2]*m[2] + m[3]*m[3]))
+
+    this.maxGlyphDistance = MaxGlyphDistance * this.size;
 
     this.toString = function() {
         return "GlyphMatrix(" + this.m.join(",") + ")";
@@ -138,7 +140,7 @@ function GlyphMatrix(m) {
 
 function Glyph(f, m, g, u, v, ctm, color) {
 
-    // Font, Matrix, Glyph, Unicode, Vertical, Contextual Transform Matrix
+    // Font, Matrix, Glyph, Unicode, Vertical, Current Transform Matrix
 
     this.font = f;
     this.matrix = new GlyphMatrix(m);
@@ -291,7 +293,7 @@ function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhiteli
 
     this.anonymize = function(glyphs) {
         var attempts = 0;
-        var tolerance = GlyphReplacementTolerance * Math.abs(glyphs[0].matrix.m[0]);
+        var tolerance = GlyphReplacementTolerance * glyphs[0].matrix.size;
         var original = "";
         for (var i = 0; i < glyphs.length; ++i) {
             original += glyphs[i].string;
