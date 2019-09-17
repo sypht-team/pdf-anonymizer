@@ -217,8 +217,8 @@ function Glyph(f, m, g, u, v, ctm, color) {
         return new Glyph(this.font, this.matrix.m, g, u, this.wmode, this.ctm, color);
     }
 
-    this.succeeds = function(other) {
-        if (other.string == " ") {
+    this.succeeds = function(other, separatorCharactors) {
+        if (separatorCharactors.indexOf(other.string) >= 0) {
             return false;
         }
         if (this.font != other.font) {
@@ -276,7 +276,7 @@ function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhiteli
             var curr = glyphs[i];
             if (chunk.length > 0) {
                 var last = chunk[chunk.length-1];
-                if (!curr.succeeds(last)) {
+                if (!curr.succeeds(last, this.characterWhitelist)) {
                     chunks.push(chunk);
                     chunk = [];
                 }
