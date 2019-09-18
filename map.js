@@ -60,7 +60,7 @@ function CharacterMap(page, substitutionFrequencies) {
     }
 
     this.anonymize = function(fontName, unicode) {
-        var score = 0;
+        var score = -1;
         for (var group in fontSubstitutionGroups[fontName]) {
             var characters = fontSubstitutionGroups[fontName][group];
             if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {

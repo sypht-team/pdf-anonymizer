@@ -81,7 +81,9 @@ Glyph.prototype.randomize = function(characterMap, characterWhitelist, zoneWhite
         var result = characterMap.anonymize(this.font.getName(), this.unicode);
         unicode = result.unicode;
         glyph = result.glyph;
-        if (result.score < 0.25) {
+        if (result.score < 0) {
+            highlightColor = [1, 0.5, 0];
+        } else if (result.score < 0.25) {
             highlightColor = [1, 0, 0];
         } else if (unicode == this.unicode) {
             highlightColor = [0, 1, 1];
