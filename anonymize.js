@@ -159,18 +159,17 @@ function Glyph(f, m, g, u, v, ctm, color) {
     }
 
     // Vertices are computed relative to the ctm
-    var trm = this.matrix.transform(this.ctm);
     this.vertices = [];
     if (this.wmode == 0) {
-        this.vertices.push(trm.advance(0, 0).coords());
-        this.vertices.push(trm.advance(0, 1).coords());
-        this.vertices.push(trm.advance(adv, 1).coords());
-        this.vertices.push(trm.advance(adv, 0).coords());
+        this.vertices.push(this.matrix.advance(0, 0).transform(this.ctm).coords());
+        this.vertices.push(this.matrix.advance(0, 1).transform(this.ctm).coords());
+        this.vertices.push(this.matrix.advance(adv, 1).transform(this.ctm).coords());
+        this.vertices.push(this.matrix.advance(adv, 0).transform(this.ctm).coords());
     } else {
-        this.vertices.push(trm.advance(0, 0).coords());
-        this.vertices.push(trm.advance(1, 0).coords());
-        this.vertices.push(trm.advance(1, -adv).coords());
-        this.vertices.push(trm.advance(0, -adv).coords());
+        this.vertices.push(this.matrix.advance(0, 0).transform(this.ctm).coords());
+        this.vertices.push(this.matrix.advance(1, 0).transform(this.ctm).coords());
+        this.vertices.push(this.matrix.advance(1, -adv).transform(this.ctm).coords());
+        this.vertices.push(this.matrix.advance(0, -adv).transform(this.ctm).coords());
     }
 
     this.toString = function() {
