@@ -7,8 +7,6 @@ var MaxGlyphDistance = 0.1;
 
 function Glyph(font, matrix, glyph, unicode, wmode, ctm, highlightColor) {
 
-    // Font, Matrix, Glyph, Unicode, Writing Mode, Current Transform Matrix
-
     this.font = font;
     this.matrix = matrix;
     this.glyph = glyph;
@@ -37,12 +35,15 @@ function Glyph(font, matrix, glyph, unicode, wmode, ctm, highlightColor) {
         this.vertices.push(this.matrix.advance(0, -adv).transform(this.ctm).coords);
     }
 }
+
 Glyph.prototype.toString = function() {
     return "Glyph(" + [this.font.getName(), this.matrix.transform(this.ctm).toString(), this.unicode, this.glyph, this.wmode].join(", ") + ")";
 };
+
 Glyph.prototype.placeAfter = function(glyph) {
     return new Glyph(this.font, glyph.nextMatrix, this.glyph, this.unicode, this.wmode, this.ctm, this.highlightColor);
 };
+
 Glyph.prototype.isWithin = function(zones) {
     var avgX = 0, avgY = 0;
     for (var i = 0; i < this.vertices.length; ++i) {
@@ -65,6 +66,7 @@ Glyph.prototype.isWithin = function(zones) {
     }
     return false;
 };
+
 Glyph.prototype.randomize = function(characterMap, characterWhitelist, zoneWhitelist) {
     var unicode, glyph, highlightColor;
     if (this.isWithin(zoneWhitelist)) {
@@ -89,6 +91,7 @@ Glyph.prototype.randomize = function(characterMap, characterWhitelist, zoneWhite
     }
     return new Glyph(this.font, this.matrix, glyph, unicode, this.wmode, this.ctm, highlightColor);
 };
+
 Glyph.prototype.succeeds = function(other, separatorCharactors) {
     if (separatorCharactors.indexOf(other.string) >= 0) {
         return false;
@@ -106,20 +109,24 @@ function GlyphMatrix(m) {
     this.m = m;
     this.coords = m.slice(4, 6);
 }
+
 GlyphMatrix.prototype.toString = function() {
     return "GlyphMatrix(" + this.m.join(",") + ")";
 };
+
 GlyphMatrix.prototype.advance = function(tx, ty) {
     var m = this.m.slice();
     m[4] += tx * m[0] + ty * m[2];
     m[5] += tx * m[1] + ty * m[3];
     return new GlyphMatrix(m);
 };
+
 GlyphMatrix.prototype.distance = function(other) {
     var dx = other.m[4] - this.m[4];
     var dy = other.m[5] - this.m[5];
     return Math.sqrt(dx*dx + dy*dy);
 };
+
 GlyphMatrix.prototype.equals = function(other, maxDistance) {
     for (var i = 0; i < 4; ++i) {
         if (this.m[i] != other.m[i]) {
@@ -128,6 +135,7 @@ GlyphMatrix.prototype.equals = function(other, maxDistance) {
     }
     return this.distance(other) <= maxDistance;
 };
+
 GlyphMatrix.prototype.transform = function(ctm) {
     return new GlyphMatrix(Concat(this.m, ctm));
 };

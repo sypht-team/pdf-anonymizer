@@ -15,5 +15,11 @@ if (scriptArgs.length != 3) {
     quit(1);
 }
 
-var anonymizer = new pdf.Anonymizer(scriptArgs[0], parseInt(scriptArgs[1])-1, SubstitutionFrequencies, CharacterWhitelist, scriptArgs[0].replace(".pdf", ".json"));
-anonymizer.run(Resolution, scriptArgs[2], scriptArgs[2].replace(".png", ".info.png"));
+var fileName = scriptArgs[0];
+var pageIndex = parseInt(scriptArgs[1]) - 1;
+var annotationsFile = scriptArgs[0].replace(".pdf", ".json");
+var outputFile = scriptArgs[2];
+var highlightedOutputFile = scriptArgs[2].replace(".png", ".info.png");
+
+var anonymizer = new pdf.Anonymizer(fileName, pageIndex, SubstitutionFrequencies, CharacterWhitelist, annotationsFile);
+anonymizer.run(Resolution, outputFile, highlightedOutputFile);
