@@ -315,7 +315,7 @@ function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhiteli
         for (var i = 0; i < glyphs.length; ++i) {
             original += glyphs[i].string;
         }
-        print("Replacing", original, "(tolerance:", tolerance + ")");
+        print("replacing " + JSON.stringify(original) + " (tolerance: " + tolerance.toFixed(1) + ")");
         while (true) {
             attempts++;
             var candidate = this.randomize(glyphs);
@@ -324,18 +324,17 @@ function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhiteli
             for (var i = 0; i < candidate.length; ++i) {
                 candidateString += candidate[i].string;
             }
-            print(original, " -> ", candidateString, "(" + candidateDistance + ")");
+            print(JSON.stringify(original) + " -> " + JSON.stringify(candidateString) + " (" + candidateDistance.toFixed(1) + ")");
             if (candidateDistance <= tolerance) {
                 for (var i = 0; i < candidate.length; ++i) {
                     this.replacements[glyphs[i]] = candidate[i];
                 }
-                print("attempts:", attempts);
-                print("\n");
+                print("attempts: " + attempts + "\n");
                 return candidate;
             }
             if (attempts % (BackOffFrequency * glyphs.length) == 0) {
                 tolerance *= BackOffAmount;
-                print("increasing tolerance to", tolerance);
+                print("increasing tolerance to " + tolerance.toFixed(1));
             }
         }
     };
