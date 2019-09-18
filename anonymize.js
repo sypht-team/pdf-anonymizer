@@ -103,14 +103,7 @@ function GlyphMatrix(m) {
         return "GlyphMatrix(" + this.m.join(",") + ")";
     }
 
-    this.advance = function(font, glyph, wmode) {
-        var adv = font.advanceGlyph(glyph, wmode);
-        var tx = 0, ty = 0;
-        if (wmode == 0) {
-            tx = adv;
-        } else {
-            ty = -adv;
-        }
+    this.advance = function(tx, ty) {
         var m = this.m.slice();
         m[4] += tx * m[0] + ty * m[2];
         m[5] += tx * m[1] + ty * m[3];
@@ -136,6 +129,10 @@ function GlyphMatrix(m) {
         return new GlyphMatrix(Concat(this.m, ctm));
     }
 
+    this.coords = function() {
+        return this.m.slice(4, 6);
+    }
+
 }
 
 function Glyph(f, m, g, u, v, ctm, color) {
@@ -144,11 +141,19 @@ function Glyph(f, m, g, u, v, ctm, color) {
 
     this.font = f;
     this.matrix = new GlyphMatrix(m);
-    this.nextMatrix = this.matrix.advance(f, g, v);
     this.glyph = g;
     this.unicode = u;
     this.wmode = v;
     this.ctm = ctm;
+
+    var adv = f.advanceGlyph(g, v);
+    var tx = 0, ty = 0;
+    if (v == 0) {
+        tx = adv;
+    } else {
+        ty = -adv;
+    }
+    this.nextMatrix = this.matrix.advance(tx, ty);
 
     if (color === undefined) {
         color = [0, 0, 0];
@@ -159,11 +164,17 @@ function Glyph(f, m, g, u, v, ctm, color) {
 
     var t = this.matrix.transform(this.ctm);
     var a = this.nextMatrix.transform(this.ctm);
+
     this.vertices = [];
-    this.vertices.push([t.m[4], t.m[5]]);
-    this.vertices.push([t.m[4] + t.m[2], t.m[5] + t.m[3]]);
-    this.vertices.push([a.m[4] + a.m[2], a.m[5] + a.m[3]]);
-    this.vertices.push([a.m[4], a.m[5]]);
+    this.vertices.push(t.coords());
+    if (this.wmode == 0) {
+        this.vertices.push(t.advance(0, 1).coords());
+        this.vertices.push(a.advance(0, 1).coords());
+    } else {
+        this.vertices.push(t.advance(1, 0).coords());
+        this.vertices.push(a.advance(1, 0).coords());
+    }
+    this.vertices.push(a.coords());
 
     this.toString = function() {
         return "Glyph(" + [this.font.getName(), this.matrix.transform(this.ctm).toString(), this.unicode, this.glyph, this.wmode].join(", ") + ")";
