@@ -161,8 +161,8 @@ function Glyph(f, m, g, u, v, ctm, color) {
     var a = this.nextMatrix.transform(this.ctm);
     this.vertices = [];
     this.vertices.push([t.m[4], t.m[5]]);
-    this.vertices.push([t.m[4] + t.m[1], t.m[5] - t.m[0]]);
-    this.vertices.push([a.m[4] + a.m[1], a.m[5] - a.m[0]]);
+    this.vertices.push([t.m[4] + t.m[1], t.m[5] + t.m[3]]);
+    this.vertices.push([a.m[4] + a.m[1], a.m[5] + a.m[3]]);
     this.vertices.push([a.m[4], a.m[5]]);
 
     this.toString = function() {
