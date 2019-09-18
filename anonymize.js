@@ -141,20 +141,20 @@ function GlyphMatrix(m) {
 
 }
 
-function Glyph(f, m, g, u, v, ctm, highlightColor) {
+function Glyph(font, matrix, glyph, unicode, wmode, ctm, highlightColor) {
 
-    // Font, Matrix, Glyph, Unicode, Vertical, Current Transform Matrix
+    // Font, Matrix, Glyph, Unicode, Writing Mode, Current Transform Matrix
 
-    this.font = f;
-    this.matrix = new GlyphMatrix(m);
-    this.glyph = g;
-    this.unicode = u;
-    this.wmode = v;
+    this.font = font;
+    this.matrix = matrix;
+    this.glyph = glyph;
+    this.unicode = unicode;
+    this.wmode = wmode;
     this.ctm = ctm;
 
     this.highlightColor = highlightColor;
 
-    this.string = String.fromCharCode(u);
+    this.string = String.fromCharCode(unicode);
 
     var adv = this.font.advanceGlyph(this.glyph, this.wmode);
     if (this.wmode == 0) {
@@ -184,7 +184,7 @@ function Glyph(f, m, g, u, v, ctm, highlightColor) {
     }
 
     this.placeAfter = function(glyph) {
-        return new Glyph(this.font, glyph.nextMatrix.m, this.glyph, this.unicode, this.wmode, this.ctm, this.highlightColor);
+        return new Glyph(this.font, glyph.nextMatrix, this.glyph, this.unicode, this.wmode, this.ctm, this.highlightColor);
     }
 
     this.isWithin = function(zones) {
@@ -211,28 +211,28 @@ function Glyph(f, m, g, u, v, ctm, highlightColor) {
     }
 
     this.randomize = function(characterMap, characterWhitelist, zoneWhitelist) {
-        var u, g, highlightColor;
+        var unicode, glyph, highlightColor;
         if (this.isWithin(zoneWhitelist)) {
-            u = this.unicode;
-            g = this.glyph;
+            unicode = this.unicode;
+            glyph = this.glyph;
             highlightColor = [0, 0, 1];
         } else if (characterWhitelist.indexOf(this.string) >= 0) {
-            u = this.unicode;
-            g = this.glyph;
+            unicode = this.unicode;
+            glyph = this.glyph;
             highlightColor = [0, 1, 0];
         } else {
             var result = characterMap.anonymize(this.font.getName(), this.unicode);
-            u = result.unicode;
-            g = result.glyph;
+            unicode = result.unicode;
+            glyph = result.glyph;
             if (result.score < 0.25) {
                 highlightColor = [1, 0, 0];
-            } else if (u == this.unicode) {
+            } else if (unicode == this.unicode) {
                 highlightColor = [0, 1, 1];
             } else {
                 highlightColor = [0, 1, 0];
             }
         }
-        return new Glyph(this.font, this.matrix.m, g, u, this.wmode, this.ctm, highlightColor);
+        return new Glyph(this.font, this.matrix, glyph, unicode, this.wmode, this.ctm, highlightColor);
     }
 
     this.succeeds = function(other, separatorCharactors) {
@@ -272,6 +272,7 @@ function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhiteli
         var glyphs = []
         text.walk({
             showGlyph: function (f, m, g, u, v) {
+                m = new GlyphMatrix(m);
                 glyphs.push(new Glyph(f, m, g, u, v, ctm));
             }
         });
