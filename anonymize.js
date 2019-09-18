@@ -104,6 +104,7 @@ function GlyphMatrix(m) {
 
     // Transform with 6 elements.
     this.m = m;
+    this.coords = m.slice(4, 6);
 
     this.toString = function() {
         return "GlyphMatrix(" + this.m.join(",") + ")";
@@ -135,10 +136,6 @@ function GlyphMatrix(m) {
         return new GlyphMatrix(Concat(this.m, ctm));
     }
 
-    this.coords = function() {
-        return this.m.slice(4, 6);
-    }
-
 }
 
 function Glyph(font, matrix, glyph, unicode, wmode, ctm, highlightColor) {
@@ -156,27 +153,22 @@ function Glyph(font, matrix, glyph, unicode, wmode, ctm, highlightColor) {
 
     this.string = String.fromCharCode(unicode);
 
+    this.vertices = [];
     var adv = this.font.advanceGlyph(this.glyph, this.wmode);
     if (this.wmode == 0) {
         this.nextMatrix = this.matrix.advance(adv, 0);
         this.size = this.matrix.distance(this.matrix.advance(0, 1));
+        this.vertices.push(this.matrix.advance(0, 0).transform(this.ctm).coords);
+        this.vertices.push(this.matrix.advance(0, 1).transform(this.ctm).coords);
+        this.vertices.push(this.matrix.advance(adv, 1).transform(this.ctm).coords);
+        this.vertices.push(this.matrix.advance(adv, 0).transform(this.ctm).coords);
     } else {
         this.nextMatrix = this.matrix.advance(0, -adv);
         this.size = this.matrix.distance(this.matrix.advance(1, 0));
-    }
-
-    // Vertices are computed relative to the ctm
-    this.vertices = [];
-    if (this.wmode == 0) {
-        this.vertices.push(this.matrix.advance(0, 0).transform(this.ctm).coords());
-        this.vertices.push(this.matrix.advance(0, 1).transform(this.ctm).coords());
-        this.vertices.push(this.matrix.advance(adv, 1).transform(this.ctm).coords());
-        this.vertices.push(this.matrix.advance(adv, 0).transform(this.ctm).coords());
-    } else {
-        this.vertices.push(this.matrix.advance(0, 0).transform(this.ctm).coords());
-        this.vertices.push(this.matrix.advance(1, 0).transform(this.ctm).coords());
-        this.vertices.push(this.matrix.advance(1, -adv).transform(this.ctm).coords());
-        this.vertices.push(this.matrix.advance(0, -adv).transform(this.ctm).coords());
+        this.vertices.push(this.matrix.advance(0, 0).transform(this.ctm).coords);
+        this.vertices.push(this.matrix.advance(1, 0).transform(this.ctm).coords);
+        this.vertices.push(this.matrix.advance(1, -adv).transform(this.ctm).coords);
+        this.vertices.push(this.matrix.advance(0, -adv).transform(this.ctm).coords);
     }
 
     this.toString = function() {
