@@ -95,10 +95,6 @@ function GlyphMatrix(m) {
     // Transform with 6 elements.
     this.m = m;
 
-    this.size = Math.max(Math.sqrt(m[0]*m[0] + m[1]*m[1]), Math.sqrt(m[2]*m[2] + m[3]*m[3]))
-
-    this.maxGlyphDistance = MaxGlyphDistance * this.size;
-
     this.toString = function() {
         return "GlyphMatrix(" + this.m.join(",") + ")";
     }
@@ -116,13 +112,13 @@ function GlyphMatrix(m) {
         return Math.sqrt(dx*dx + dy*dy);
     }
 
-    this.equals = function(other) {
+    this.equals = function(other, maxDistance) {
         for (var i = 0; i < 4; ++i) {
             if (this.m[i] != other.m[i]) {
                 return false;
             }
         }
-        return this.distance(other) <= this.maxGlyphDistance;
+        return this.distance(other) <= maxDistance;
     }
 
     this.transform = function(ctm) {
@@ -146,15 +142,6 @@ function Glyph(f, m, g, u, v, ctm, color) {
     this.wmode = v;
     this.ctm = ctm;
 
-    var adv = f.advanceGlyph(g, v);
-    var tx = 0, ty = 0;
-    if (v == 0) {
-        tx = adv;
-    } else {
-        ty = -adv;
-    }
-    this.nextMatrix = this.matrix.advance(tx, ty);
-
     if (color === undefined) {
         color = [0, 0, 0];
     }
@@ -162,19 +149,29 @@ function Glyph(f, m, g, u, v, ctm, color) {
 
     this.string = String.fromCharCode(u);
 
-    var t = this.matrix.transform(this.ctm);
-    var a = this.nextMatrix.transform(this.ctm);
-
-    this.vertices = [];
-    this.vertices.push(t.coords());
+    var adv = this.font.advanceGlyph(this.glyph, this.wmode);
     if (this.wmode == 0) {
-        this.vertices.push(t.advance(0, 1).coords());
-        this.vertices.push(a.advance(0, 1).coords());
+        this.nextMatrix = this.matrix.advance(adv, 0);
+        this.size = this.matrix.distance(this.matrix.advance(0, 1));
     } else {
-        this.vertices.push(t.advance(1, 0).coords());
-        this.vertices.push(a.advance(1, 0).coords());
+        this.nextMatrix = this.matrix.advance(0, -adv);
+        this.size = this.matrix.distance(this.matrix.advance(1, 0));
     }
-    this.vertices.push(a.coords());
+
+    // Vertices are computed relative to the ctm
+    var trm = this.matrix.transform(this.ctm);
+    this.vertices = [];
+    if (this.wmode == 0) {
+        this.vertices.push(trm.advance(0, 0).coords());
+        this.vertices.push(trm.advance(0, 1).coords());
+        this.vertices.push(trm.advance(adv, 1).coords());
+        this.vertices.push(trm.advance(adv, 0).coords());
+    } else {
+        this.vertices.push(trm.advance(0, 0).coords());
+        this.vertices.push(trm.advance(1, 0).coords());
+        this.vertices.push(trm.advance(1, -adv).coords());
+        this.vertices.push(trm.advance(0, -adv).coords());
+    }
 
     this.toString = function() {
         return "Glyph(" + [this.font.getName(), this.matrix.transform(this.ctm).toString(), this.unicode, this.glyph, this.wmode].join(", ") + ")";
@@ -242,7 +239,7 @@ function Glyph(f, m, g, u, v, ctm, color) {
         if (this.wmode != other.wmode) {
             return false;
         }
-        return this.matrix.equals(other.nextMatrix);
+        return this.matrix.equals(other.nextMatrix, this.size*MaxGlyphDistance);
     }
 
 }
@@ -306,7 +303,7 @@ function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhiteli
 
     this.anonymize = function(glyphs) {
         var attempts = 0;
-        var tolerance = GlyphReplacementTolerance * glyphs[0].matrix.size;
+        var tolerance = GlyphReplacementTolerance * glyphs[0].size;
         var original = "";
         for (var i = 0; i < glyphs.length; ++i) {
             original += glyphs[i].string;
