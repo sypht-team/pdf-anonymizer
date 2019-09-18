@@ -161,8 +161,8 @@ function Glyph(f, m, g, u, v, ctm, color) {
     var a = this.nextMatrix.transform(this.ctm);
     this.vertices = [];
     this.vertices.push([t.m[4], t.m[5]]);
-    this.vertices.push([t.m[4] + t.m[1], t.m[5] + t.m[3]]);
-    this.vertices.push([a.m[4] + a.m[1], a.m[5] + a.m[3]]);
+    this.vertices.push([t.m[4] + t.m[2], t.m[5] + t.m[3]]);
+    this.vertices.push([a.m[4] + a.m[2], a.m[5] + a.m[3]]);
     this.vertices.push([a.m[4], a.m[5]]);
 
     this.toString = function() {
@@ -174,13 +174,15 @@ function Glyph(f, m, g, u, v, ctm, color) {
     }
 
     this.isWithin = function(zones) {
-        var points = this.vertices;
         var avgX = 0, avgY = 0;
-        for (var i = 0; i < points.length; ++i) {
-            avgX += points[i][0] / points.length;
-            avgY += points[i][1] / points.length;
+        for (var i = 0; i < this.vertices.length; ++i) {
+            avgX += this.vertices[i][0] / this.vertices.length;
+            avgY += this.vertices[i][1] / this.vertices.length;
         }
+        var points = [];
+        points.push(this.vertices[0]);
         points.push([avgX, avgY]);
+        points.push(this.vertices[3]);
         for (var i = 0; i < zones.length; ++i) {
             var zone = zones[i];
             for (var j = 0; j < points.length; ++j) {
