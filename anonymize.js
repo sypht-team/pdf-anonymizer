@@ -474,6 +474,18 @@ function PdfAnonymizer(fileName, pageIndex, substitutionGroups, characterWhiteli
             }
             anonymizingDevice.fillPath(p, true, Identity, DeviceRGB, r.color, 0.3);
         }
+
+        for (var i = 0; i < zoneWhitelist.length; i++) {
+            var z = zoneWhitelist[i];
+            var p = new Path();
+            p.moveTo(z.x1, z.y1);
+            p.lineTo(z.x1, z.y2);
+            p.lineTo(z.x2, z.y2);
+            p.lineTo(z.x2, z.y1);
+            p.lineTo(z.x1, z.y1);
+            anonymizingDevice.strokePath(p, 5, Identity, DeviceRGB, [1, 0, 0], 1.0);
+        }
+
         pixmap.saveAsPNG(highlightedOutputFile);
 
         anonymizingDevice.close();
