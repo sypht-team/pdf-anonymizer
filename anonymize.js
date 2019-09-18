@@ -269,7 +269,7 @@ function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhiteli
     };
 
     this.textToGlyphs = function(text, ctm) {
-        var glyphs = []
+        var glyphs = [];
         text.walk({
             showGlyph: function (f, m, g, u, v) {
                 m = new GlyphMatrix(m);
@@ -472,7 +472,7 @@ function PdfAnonymizer(fileName, pageIndex, substitutionFrequencies, characterWh
             var r = anonymizingDevice.replacements[k];
             var v = r.vertices;
             var p = new Path();
-            p.moveTo(v[v.length-1][0], v[v.length-1][1])
+            p.moveTo(v[v.length-1][0], v[v.length-1][1]);
             for (var j = 0; j < v.length; ++j) {
                 var x = v[j][0];
                 var y = v[j][1];
@@ -499,7 +499,7 @@ function PdfAnonymizer(fileName, pageIndex, substitutionFrequencies, characterWh
 }
 
 if (scriptArgs.length != 3) {
-    print("usage: mutool run anonymize.js document.pdf pageNumber output.png")
+    print("usage: mutool run anonymize.js document.pdf pageNumber output.png");
     quit(1);
 }
 
