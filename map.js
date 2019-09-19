@@ -3,26 +3,36 @@
 // It is also able to suggest a substitution for a given glyph, based on the
 // substitutionFrequencies table.
 
-function CharacterMap(page, substitutionFrequencies) {
-
-    var substitutionGroups = {};
-    for (var group in substitutionFrequencies) {
-        substitutionGroups[group] = "";
-        for (var chr in substitutionFrequencies[group]) {
-            for (var i = 0; i < substitutionFrequencies[group][chr]; ++i) {
-                substitutionGroups[group] += chr;
-            }
+function RandomSelector(groups) {
+    this.groups = groups;
+    this.total = 0;
+    for (var k in this.groups) {
+        this.total += this.groups[k];
+    }
+}
+RandomSelector.prototype.choice = function() {
+    var index = Math.random() * this.total;
+    for (var k in this.groups) {
+        index -= this.groups[k];
+        if (index <= 0) {
+            return k;
         }
     }
+};
+RandomSelector.prototype.has = function(key) {
+    return key in this.groups;
+};
+
+function CharacterMap(page, substitutionGroups) {
 
     var map = {};
     var characterAnalyzer = {
-        showGlyph: function(f, m, g, u) {
-            var fn = f.getName();
-            if (!(fn in map)) {
-                map[fn] = {};
+        showGlyph: function(font, matrix, glyph, unicode) {
+            var fontName = font.getName();
+            if (!(fontName in map)) {
+                map[fontName] = {};
             }
-            map[fn][u] = g;
+            map[fontName][unicode] = glyph;
         },
         fillText: function(text) { text.walk(this); },
         clipText: function(text) { text.walk(this); },
@@ -32,41 +42,32 @@ function CharacterMap(page, substitutionFrequencies) {
     }
     page.run(characterAnalyzer, Identity);
 
-    var countUnique = function(characters) {
-        var unique = {};
-        for (var i = 0; i < characters.length; ++i) {
-            unique[characters[i]] = true;
-        }
-        return Object.keys(unique).length;
-    };
-
     var fontSubstitutionGroups = {};
     var fontSubstitutionGroupScores = {};
     for (var fontName in map) {
         fontSubstitutionGroups[fontName] = {};
         fontSubstitutionGroupScores[fontName] = {};
         for (var group in substitutionGroups) {
-            fontSubstitutionGroups[fontName][group] = "";
-            var characters = substitutionGroups[group];
-            for (var i = 0; i < characters.length; ++i) {
-                var chr = characters[i];
-                var uni = chr.charCodeAt(0);
-                if (uni in map[fontName]) {
-                    fontSubstitutionGroups[fontName][group] += chr;
+            fontSubstitutionGroups[fontName][group] = {};
+            var total = 0, included = 0;
+            for (var chr in substitutionGroups[group]) {
+                total++;
+                if (chr.charCodeAt(0) in map[fontName]) {
+                    included++;
+                    fontSubstitutionGroups[fontName][group][chr] = substitutionGroups[group][chr];
                 }
             }
-            fontSubstitutionGroupScores[fontName][group] = countUnique(fontSubstitutionGroups[fontName][group]) / countUnique(substitutionGroups[group]);
+            fontSubstitutionGroups[fontName][group] = new RandomSelector(fontSubstitutionGroups[fontName][group]);
+            fontSubstitutionGroupScores[fontName][group] = included / total;
         }
     }
 
     this.anonymize = function(fontName, unicode) {
         var score = -1;
         for (var group in fontSubstitutionGroups[fontName]) {
-            var characters = fontSubstitutionGroups[fontName][group];
-            if (characters.indexOf(String.fromCharCode(unicode)) >= 0) {
-                unicode = characters[parseInt(Math.random()*characters.length)].charCodeAt(0);
+            if (fontSubstitutionGroups[fontName][group].has(String.fromCharCode(unicode))) {
+                unicode = fontSubstitutionGroups[fontName][group].choice().charCodeAt(0);
                 score = fontSubstitutionGroupScores[fontName][group];
-                break;
             }
         }
         var glyph = map[fontName][unicode];
