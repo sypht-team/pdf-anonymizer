@@ -5,6 +5,14 @@
 // This parameter should rarely require tuning.
 var MaxGlyphDistance = 0.1;
 
+var MinHorizontalOverlap = 0.1;
+var MinVerticalOverlap = 0.5;
+
+var Direction = {
+    Horizontal: 0,
+    Vertical: 1
+}
+
 function Glyph(font, matrix, glyph, unicode, wmode, ctm, highlightColor) {
 
     this.font = font;
@@ -34,6 +42,21 @@ function Glyph(font, matrix, glyph, unicode, wmode, ctm, highlightColor) {
         this.vertices.push(this.matrix.advance(1, -adv).transform(this.ctm).coords);
         this.vertices.push(this.matrix.advance(0, -adv).transform(this.ctm).coords);
     }
+
+    var xs = this.vertices.map(function(v) {return v[0]});
+    var ys = this.vertices.map(function(v) {return v[1]});
+    this.x1 = Math.min.apply(null, xs);
+    this.y1 = Math.min.apply(null, ys);
+    this.x2 = Math.max.apply(null, xs);
+    this.y2 = Math.max.apply(null, ys);
+    this.width = this.x2-this.x1;
+    this.height = this.y2-this.y1;
+
+    if (this.nextMatrix.transform(this.ctm).coords[0] == this.matrix.transform(this.ctm).coords[0]) {
+        this.direction = Direction.Vertical;
+    } else {
+        this.direction = Direction.Horizontal;
+    }
 }
 
 Glyph.prototype.toString = function() {
@@ -45,23 +68,20 @@ Glyph.prototype.placeAfter = function(glyph) {
 };
 
 Glyph.prototype.isWithin = function(zones) {
-    var avgX = 0, avgY = 0;
-    for (var i = 0; i < this.vertices.length; ++i) {
-        avgX += this.vertices[i][0] / this.vertices.length;
-        avgY += this.vertices[i][1] / this.vertices.length;
-    }
-    var points = [];
-    points.push(this.vertices[0]);
-    points.push([avgX, avgY]);
-    points.push(this.vertices[3]);
     for (var i = 0; i < zones.length; ++i) {
         var zone = zones[i];
-        for (var j = 0; j < points.length; ++j) {
-            var x0 = points[j][0];
-            var y0 = points[j][1];
-            if (x0 >= zone.x1 && x0 <= zone.x2 && y0 >= zone.y1 && y0 <= zone.y2) {
-                return true;
-            }
+        var dx = Math.min(this.x2, zone.x2) - Math.max(this.x1, zone.x1);
+        var dy = Math.min(this.y2, zone.y2) - Math.max(this.y1, zone.y1);
+        var horizontalOverlap, verticalOverlap;
+        if (this.direction == Direction.Horizontal) {
+            horizontalOverlap = dx/this.width;
+            verticalOverlap = dy/this.height;
+        } else {
+            horizontalOverlap = dy/this.height;
+            verticalOverlap = dx/this.width;
+        }
+        if (horizontalOverlap >= MinHorizontalOverlap && verticalOverlap >= MinVerticalOverlap) {
+            return true;
         }
     }
     return false;

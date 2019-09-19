@@ -68,6 +68,7 @@ function CharacterMap(page, substitutionGroups) {
             if (fontSubstitutionGroups[fontName][group].has(String.fromCharCode(unicode))) {
                 unicode = fontSubstitutionGroups[fontName][group].choice().charCodeAt(0);
                 score = fontSubstitutionGroupScores[fontName][group];
+                break;
             }
         }
         var glyph = map[fontName][unicode];
