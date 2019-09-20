@@ -41,7 +41,7 @@ function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhiteli
         text.walk({
             showGlyph: function (f, m, g, u, v) {
                 m = new glyph.GlyphMatrix(m);
-                glyphs.push(new glyph.Glyph(f, m, g, u, v, ctm));
+                glyphs.push(new glyph.Glyph(f, m, g, u, v, ctm, 0));
             }
         });
         return glyphs;
@@ -72,6 +72,9 @@ function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhiteli
         }
         if (chunk.length > 0) {
             chunks.push(chunk);
+        }
+        for (var i = 0; i < chunks.length; ++i) {
+            chunks[i] = kernGlyphs(chunks[i]);
         }
         return chunks;
     };
@@ -193,6 +196,42 @@ function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhiteli
     this.close = function() {
         return this.dd.close();
     };
+}
+
+function determineKerning(font, glyph, wmode, matrix, nextMatrix) {
+    var tx = 0, ty = 0;
+    var adv = font.advanceGlyph(glyph, wmode);
+    if (wmode == 0) {
+        if (matrix[0] != 0) {
+            tx = (nextMatrix[4] - matrix[4])/matrix[0];
+        } else if (matrix[1] != 0) {
+            tx = (nextMatrix[5] - matrix[5])/matrix[1];
+        } else {
+            tx = adv;
+        }
+        return tx - adv;
+    } else {
+        if (matrix[2] != 0) {
+            ty = (nextMatrix[4] - matrix[4])/matrix[2];
+        } else if (matrix[3] != 0) {
+            ty = (nextMatrix[5] - matrix[5])/matrix[3];
+        } else {
+            ty = -adv;
+        }
+        return ty - -adv;
+    }
+}
+
+function kernGlyphs(glyphs) {
+    var kernedGlyphs = [];
+    for (var i = 0; i < glyphs.length; ++i) {
+        var kern = 0;
+        if (i < glyphs.length - 1) {
+            kern = determineKerning(glyphs[i].font, glyphs[i].glyph, glyphs[i].wmode, glyphs[i].matrix.m, glyphs[i+1].matrix.m);
+        }
+        kernedGlyphs.push(glyphs[i].withKerning(kern));
+    }
+    return kernedGlyphs;
 }
 
 exports.AnonymizingDevice = AnonymizingDevice;

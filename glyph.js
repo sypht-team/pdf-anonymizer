@@ -13,7 +13,7 @@ var Direction = {
     Vertical: 1
 }
 
-function Glyph(font, matrix, glyph, unicode, wmode, ctm, highlightColor) {
+function Glyph(font, matrix, glyph, unicode, wmode, ctm, kern, highlightColor) {
 
     this.font = font;
     this.matrix = matrix;
@@ -21,12 +21,13 @@ function Glyph(font, matrix, glyph, unicode, wmode, ctm, highlightColor) {
     this.unicode = unicode;
     this.wmode = wmode;
     this.ctm = ctm;
+    this.kern = kern;
     this.highlightColor = highlightColor;
 
     this.string = String.fromCharCode(unicode);
 
     this.vertices = [];
-    var adv = this.font.advanceGlyph(this.glyph, this.wmode);
+    var adv = this.font.advanceGlyph(this.glyph, this.wmode) + this.kern;
     if (this.wmode == 0) {
         this.nextMatrix = this.matrix.advance(adv, 0);
         this.size = this.matrix.distance(this.matrix.advance(0, 1));
@@ -64,7 +65,11 @@ Glyph.prototype.toString = function() {
 };
 
 Glyph.prototype.placeAfter = function(glyph) {
-    return new Glyph(this.font, glyph.nextMatrix, this.glyph, this.unicode, this.wmode, this.ctm, this.highlightColor);
+    return new Glyph(this.font, glyph.nextMatrix, this.glyph, this.unicode, this.wmode, this.ctm, this.kern, this.highlightColor);
+};
+
+Glyph.prototype.withKerning = function(kern) {
+    return new Glyph(this.font, this.matrix, this.glyph, this.unicode, this.wmode, this.ctm, kern, this.highlightColor);
 };
 
 Glyph.prototype.isWithin = function(zones) {
@@ -111,7 +116,7 @@ Glyph.prototype.randomize = function(characterMap, characterWhitelist, zoneWhite
             highlightColor = [0, 1, 0];
         }
     }
-    return new Glyph(this.font, this.matrix, glyph, unicode, this.wmode, this.ctm, highlightColor);
+    return new Glyph(this.font, this.matrix, glyph, unicode, this.wmode, this.ctm, this.kern, highlightColor);
 };
 
 Glyph.prototype.succeeds = function(other, separatorCharactors) {
