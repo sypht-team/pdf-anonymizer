@@ -23,7 +23,13 @@ function Anonymizer(fileName, pageIndex, substitutionFrequencies, characterWhite
             annotations[i].x2 *= outputWidth;
             annotations[i].y2 *= outputHeight;
         }
-        return annotations;
+        var pageAnnotations = [];
+        for (var i = 0; i < annotations.length; ++i) {
+            if (!("page_idx" in annotations[i]) || annotations[i]["page_idx"] == pageIndex) {
+                pageAnnotations.push(annotations[i]);
+            }
+        }
+        return pageAnnotations;
     };
 
     this.run = function(outputResolution, outputFile, highlightedOutputFile) {
