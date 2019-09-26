@@ -2,7 +2,7 @@
 
 ## Usage
 ```
-mutool run anonymize.js document.pdf pageNumber output.png
+mutool run anonymize.js input.pdf output.pdf [highlightedOutput.pdf] [whitelistZones.json]
 ```
 
 ## Requirements
