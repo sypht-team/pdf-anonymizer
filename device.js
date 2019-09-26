@@ -18,13 +18,18 @@ var BackOffAmount = 1.5;
 // methods, the AnonymizingDevice replaces the original text based on the
 // characterMap, characterWhitelist, and zoneWhitelist.
 
-function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhitelist) {
+function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhitelist, maskImages) {
 
     this.dd = DrawDevice(Identity, pixmap);
     this.characterMap = characterMap;
     this.characterWhitelist = characterWhitelist;
     this.zoneWhitelist = zoneWhitelist;
     this.replacements = {};
+
+    if (maskImages === undefined) {
+        maskImages = true;
+    }
+    this.maskImages = maskImages;
 
     this.anonymizeText = function (text, ctm) {
         var glyphs = this.textToGlyphs(text, ctm);
@@ -164,12 +169,27 @@ function AnonymizingDevice(pixmap, characterMap, characterWhitelist, zoneWhiteli
         return this.dd.fillShade(shade, ctm, alpha);
     };
     this.fillImage = function(image, ctm, alpha) {
+        if (this.maskImages) {
+            var pixmap = image.toPixmap();
+            pixmap.clear(100);
+            image = new Image(pixmap);
+        }
         return this.dd.fillImage(image, ctm, alpha);
     };
     this.fillImageMask = function(image, ctm, colorSpace, color, alpha) {
+        if (this.maskImages) {
+            var pixmap = image.toPixmap();
+            pixmap.clear(100);
+            image = new Image(pixmap);
+        }
         return this.dd.fillImageMask(image, ctm, colorSpace, color, alpha);
     };
     this.clipImageMask = function(image, ctm) {
+        if (this.maskImages) {
+            var pixmap = image.toPixmap();
+            pixmap.clear(100);
+            image = new Image(pixmap);
+        }
         return this.dd.clipImageMask(image, ctm);
     };
     this.beginMask = function(area, luminosity, colorspace, color) {
