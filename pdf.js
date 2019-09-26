@@ -1,21 +1,21 @@
 var map = require("map");
 var device = require("device");
 
-function Anonymizer(fileName, pageIndex, substitutionFrequencies, characterWhitelist, annotationsFile) {
+function Anonymizer(fileName, annotationsFile, substitutionFrequencies, characterWhitelist, outputResolution) {
 
-    var doc = new Document(fileName);
-    this.page = doc.loadPage(pageIndex);
-
-    this.characterMap = new map.CharacterMap(this.page, substitutionFrequencies);
-    this.characterWhitelist = characterWhitelist;
+    this.doc = new Document(fileName);
     this.annotationsFile = annotationsFile;
 
-    this.loadAnnotations = function(outputWidth, outputHeight) {
-        try {
-            var annotations = read(this.annotationsFile);
-        } catch (err) {
+    this.substitutionFrequencies = substitutionFrequencies;
+    this.characterWhitelist = characterWhitelist;
+
+    this.scaleMatrix = Scale(outputResolution/72, outputResolution/72);
+
+    this.loadAnnotations = function(pageIndex, outputWidth, outputHeight) {
+        if (!this.annotationsFile) {
             return [];
         }
+        var annotations = read(this.annotationsFile);
         annotations = JSON.parse(annotations);
         for (var i = 0; i < annotations.length; ++i) {
             annotations[i].x1 *= outputWidth;
@@ -25,28 +25,57 @@ function Anonymizer(fileName, pageIndex, substitutionFrequencies, characterWhite
         }
         var pageAnnotations = [];
         for (var i = 0; i < annotations.length; ++i) {
-            if (!("page_idx" in annotations[i]) || annotations[i]["page_idx"] == pageIndex) {
+            if (annotations[i]["page_idx"] == pageIndex) {
                 pageAnnotations.push(annotations[i]);
             }
         }
         return pageAnnotations;
     };
 
-    this.run = function(outputResolution, outputFile, highlightedOutputFile) {
+    this.imagesToPDF = function(images, bounds, output) {
+        var outputDoc = new PDFDocument()
+        for (var i = 0; i < images.length; ++i) {
+            var image = outputDoc.addImage(images[i]);
+            var resources = outputDoc.addObject({XObject: { Im0: image }});
+            var bound = bounds[i];
+            var contents = "q " + bound[2] + " 0 0 " + bound[3] + " 0 0 cm /Im0 Do Q\n";
+            var page = outputDoc.addPage(bound, 0, resources, contents);
+            outputDoc.insertPage(-1, page);
+        }
+        outputDoc.save(output, "compress-images");
+    }
 
-        var scaleMatrix = Scale(outputResolution/72, outputResolution/72);
-        var pixmap = this.page.toPixmap(scaleMatrix, DeviceRGB);
+    this.run = function(outputFile, highlightedOutputFile) {
+        var images = [];
+        var highlightedImages = [];
+        var bounds = [];
+        for (var i = 0; i < this.doc.countPages(); ++i) {
+            var result = this.getAnonymizedImage(i, outputFile);
+            images.push(result.output);
+            highlightedImages.push(result.highlightedOutput);
+            bounds.push(this.doc.loadPage(i).bound());
+        }
+        this.imagesToPDF(images, bounds, outputFile);
+        if (highlightedOutputFile) {
+            this.imagesToPDF(highlightedImages, bounds, highlightedOutputFile);
+        }
+    }
+
+    this.getAnonymizedImage = function(pageIndex, tempFile) {
+
+        var page = this.doc.loadPage(pageIndex);
+        var characterMap = new map.CharacterMap(page, this.substitutionFrequencies);
+
+        var pixmap = page.toPixmap(this.scaleMatrix, DeviceRGB);
         pixmap.clear(255);
 
-        var zoneWhitelist = this.loadAnnotations(pixmap.getWidth(), pixmap.getHeight());
+        var zoneWhitelist = this.loadAnnotations(pageIndex, pixmap.getWidth(), pixmap.getHeight());
 
-        var anonymizingDevice = new device.AnonymizingDevice(pixmap, this.characterMap, this.characterWhitelist, zoneWhitelist);
-        this.page.run(anonymizingDevice, scaleMatrix);
-        pixmap.saveAsPNG(outputFile);
+        var anonymizingDevice = new device.AnonymizingDevice(pixmap, characterMap, this.characterWhitelist, zoneWhitelist);
+        page.run(anonymizingDevice, this.scaleMatrix);
 
-        if (highlightedOutputFile === undefined) {
-            return;
-        }
+        pixmap.saveAsPNG(tempFile);
+        var outputImage = new Image(tempFile);
 
         for (var k in anonymizingDevice.replacements) {
             var r = anonymizingDevice.replacements[k];
@@ -72,9 +101,12 @@ function Anonymizer(fileName, pageIndex, substitutionFrequencies, characterWhite
             anonymizingDevice.strokePath(p, 5, Identity, DeviceRGB, [1, 0, 0], 1.0);
         }
 
-        pixmap.saveAsPNG(highlightedOutputFile);
+        pixmap.saveAsPNG(tempFile);
+        var highlightImage = new Image(tempFile);
 
         anonymizingDevice.close();
+
+        return {output: outputImage, highlightedOutput: highlightImage};
     };
 }
 

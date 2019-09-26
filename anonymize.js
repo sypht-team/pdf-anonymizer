@@ -10,16 +10,23 @@ var SubstitutionFrequencies = {
     digit: {0:4,   1:2,  2:2,  3:1,  4:1,   5:1,  6:1,  7:1,  8:1,   9:1}
 }
 
-if (scriptArgs.length != 3) {
-    print("usage: mutool run anonymize.js document.pdf pageNumber output.png");
+if (scriptArgs.length < 2 || scriptArgs.length > 4) {
+    print("usage: mutool run anonymize.js input.pdf output.pdf [highlightedOutput.pdf] [whitelistZones.json]");
     quit(1);
 }
 
-var fileName = scriptArgs[0];
-var pageIndex = parseInt(scriptArgs[1]) - 1;
-var annotationsFile = scriptArgs[0].replace(".pdf", ".json");
-var outputFile = scriptArgs[2];
-var highlightedOutputFile = scriptArgs[2].replace(".png", ".info.png");
+var inputFile = scriptArgs[0];
+var outputFile = scriptArgs[1];
 
-var anonymizer = new pdf.Anonymizer(fileName, pageIndex, SubstitutionFrequencies, CharacterWhitelist, annotationsFile);
-anonymizer.run(Resolution, outputFile, highlightedOutputFile);
+var highlightedOutputFile = null;
+if (scriptArgs.length > 2) {
+    highlightedOutputFile = scriptArgs[2];
+}
+
+var whitelistZonesFile = null;
+if (scriptArgs.length > 3) {
+    whitelistZonesFile = scriptArgs[3];
+}
+
+var anonymizer = new pdf.Anonymizer(inputFile, whitelistZonesFile, SubstitutionFrequencies, CharacterWhitelist, Resolution);
+anonymizer.run(outputFile, highlightedOutputFile);
