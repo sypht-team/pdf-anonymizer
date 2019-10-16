@@ -10,6 +10,19 @@ Substitutions are made within three substitution groups to maintain the shape of
 Punctuation and other text is left unchanged.
 Images are also masked with a grey box by default (can be disabled).
 
+## Requirements
+- MuPDF Tools.
+
+On Ubuntu:
+```
+sudo apt install mupdf-tools
+```
+
+On MacOS:
+```
+brew install mupdf-tools
+```
+
 ## Usage
 ```
 mutool run anonymize.js input.pdf output.pdf [highlightedOutput.pdf] [whitelistZones.json] [maskImages=1] [dpi=300]
@@ -70,16 +83,3 @@ On the left, we have the original PDF. In the middle, the result of the anonymiz
 - Vector graphics embedded within the PDF as drawing commands are not replaced.
 - The output PDF file is a completely new PDF containing a single _image_ representation of each page.
 - Non-ASCII characters are not substituted.
-
-## Requirements
-- MuPDF Tools.
-
-On Ubuntu:
-```
-sudo apt install mupdf-tools
-```
-
-On MacOS:
-```
-brew install mupdf-tools
-```
