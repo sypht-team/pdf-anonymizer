@@ -1,7 +1,7 @@
 var map = require("map");
 var device = require("device");
 
-function Anonymizer(fileName, annotationsFile, substitutionFrequencies, characterWhitelist, outputResolution) {
+function Anonymizer(fileName, annotationsFile, substitutionFrequencies, characterWhitelist, outputResolution, maskImages) {
 
     this.doc = new Document(fileName);
     this.annotationsFile = annotationsFile;
@@ -10,6 +10,7 @@ function Anonymizer(fileName, annotationsFile, substitutionFrequencies, characte
     this.characterWhitelist = characterWhitelist;
 
     this.scaleMatrix = Scale(outputResolution/72, outputResolution/72);
+    this.maskImages = maskImages;
 
     this.loadAnnotations = function(pageIndex, outputWidth, outputHeight) {
         if (!this.annotationsFile) {
@@ -71,7 +72,7 @@ function Anonymizer(fileName, annotationsFile, substitutionFrequencies, characte
 
         var zoneWhitelist = this.loadAnnotations(pageIndex, pixmap.getWidth(), pixmap.getHeight());
 
-        var anonymizingDevice = new device.AnonymizingDevice(pixmap, characterMap, this.characterWhitelist, zoneWhitelist);
+        var anonymizingDevice = new device.AnonymizingDevice(pixmap, characterMap, this.characterWhitelist, zoneWhitelist, this.maskImages);
         page.run(anonymizingDevice, this.scaleMatrix);
 
         pixmap.saveAsPNG(tempFile);

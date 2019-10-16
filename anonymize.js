@@ -2,6 +2,8 @@ var pdf = require("pdf");
 
 var Resolution = 300;
 
+var MaskImages = true;
+
 var CharacterWhitelist = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~ \t\f\r\u00A0\u2013\u2014\u2018\u2019\u201C\u201D\u2020\u2021\u2022\u2023\u2026\u20AC\u2212\u00A9\u00AE\u00AD";
 
 var SubstitutionFrequencies = {
@@ -10,8 +12,8 @@ var SubstitutionFrequencies = {
     digit: {0:4,   1:2,  2:2,  3:1,  4:1,   5:1,  6:1,  7:1,  8:1,   9:1}
 }
 
-if (scriptArgs.length < 2 || scriptArgs.length > 4) {
-    print("usage: mutool run anonymize.js input.pdf output.pdf [highlightedOutput.pdf] [whitelistZones.json]");
+if (scriptArgs.length < 2 || scriptArgs.length > 6) {
+    print("usage: mutool run anonymize.js input.pdf output.pdf [highlightedOutput.pdf] [whitelistZones.json] [maskImages=1] [dpi=300]");
     quit(1);
 }
 
@@ -28,5 +30,21 @@ if (scriptArgs.length > 3) {
     whitelistZonesFile = scriptArgs[3];
 }
 
-var anonymizer = new pdf.Anonymizer(inputFile, whitelistZonesFile, SubstitutionFrequencies, CharacterWhitelist, Resolution);
+var maskImages = MaskImages;
+if (scriptArgs.length > 4) {
+    var maskArg = scriptArgs[4].toLowerCase().replace('maskimages=', '');
+    maskImages = ["0", "false", "no", "n"].indexOf(maskArg) < 0;
+}
+
+var resolution = Resolution;
+if (scriptArgs.length > 5) {
+    var resArg = scriptArgs[5].toLowerCase().replace('dpi=', '');
+    resolution = parseInt(resArg);
+    if (resolution <= 0 || isNaN(resolution)) {
+        print("resolution must be a positive integer");
+        quit(2);
+    }
+}
+
+var anonymizer = new pdf.Anonymizer(inputFile, whitelistZonesFile, SubstitutionFrequencies, CharacterWhitelist, resolution, maskImages);
 anonymizer.run(outputFile, highlightedOutputFile);
